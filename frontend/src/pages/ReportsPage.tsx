@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { API_ROOT, API_KEY } from '@/services/api';
+import { API_ROOT, API_KEY, listAnalyses } from '@/services/api';
 import {
   Award,
   Calendar,
@@ -44,19 +44,35 @@ const reportTypeConfig: Record<ReportType, { label: string; icon: typeof FileTex
 
 // Synthesize report entries for any real analyses registered this session.
 // These are prepended so real submissions appear above the demo showcases.
+// The runtime store keeps first-registration order, so sort newest first here;
+// a missing or unparseable date sorts last.
 function getRealReports(): Report[] {
-  return listRealAnalyses().map((a) => ({
-    id: `real-${a.id}`,
-    analysisId: a.id,
-    title: a.title || a.id,
-    type: 'compliance' as ReportType,
-    generatedAt: a.createdAt || new Date().toISOString(),
-    format: 'PDF' as const,
-    pages: 0,
-    status: 'ready' as const,
-    author: 'StandIQ Intelligence Engine',
-  }));
+  const time = (r: Report) => {
+    const t = Date.parse(r.generatedAt);
+    return Number.isNaN(t) ? -Infinity : t;
+  };
+  return listRealAnalyses()
+    .map((a) => ({
+      id: `real-${a.id}`,
+      analysisId: a.id,
+      title: a.title || a.id,
+      type: 'compliance' as ReportType,
+      generatedAt: a.createdAt || '',
+      format: 'PDF' as const,
+      pages: 0,
+      status: a.status === 'failed' ? 'failed' as const : a.status === 'completed' ? 'ready' as const : 'generating' as const,
+      author: 'StandIQ Intelligence Engine',
+    }))
+    .sort((a, b) => time(b) - time(a));
 }
+
+// What a report can offer depends on where its analysis lives.
+//   demo   — seeded showcase; renders locally, no backend analysis behind it
+//   failed — the cached analysis failed; there is nothing to export
+//   stale  — cached in this browser, but the server no longer has the analysis
+//            (e.g. after a Render restart); only the local preview remains
+//   ok     — backed by a live server analysis
+type ReportState = 'demo' | 'failed' | 'stale' | 'ok';
 
 export function ReportsPage() {
   const { navigate } = useRouter();
@@ -66,6 +82,31 @@ export function ReportsPage() {
   const [isEmailing, setIsEmailing] = useState<string | null>(null);
   const [isDownloading, setIsDownloading] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
+  // IDs of the analyses the server currently holds. null = unknown (request not
+  // finished, or failed because the backend is asleep/unreachable) — in that
+  // case nothing is marked stale and every action behaves as before.
+  const [serverAnalysisIds, setServerAnalysisIds] = useState<Set<string> | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    listAnalyses()
+      .then((res: unknown) => {
+        // Only trust a well-formed list: a malformed one must not mark every report stale.
+        if (!Array.isArray(res) || !res.every((a) => a && typeof a.analysis_id === 'string')) return;
+        if (alive) setServerAnalysisIds(new Set(res.map((a) => a.analysis_id as string)));
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const reportState = (report: Report): ReportState => {
+    if (!report.id.startsWith('real-')) return 'demo';
+    if (report.status === 'failed') return 'failed';
+    if (serverAnalysisIds && !serverAnalysisIds.has(report.analysisId)) return 'stale';
+    return 'ok';
+  };
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   const handleEmailReport = async (reportId: string, analysisId: string) => {
@@ -82,9 +123,12 @@ export function ReportsPage() {
   };
 
   // Real reports download the backend-generated PDF. Seeded demo reports have no
-  // backend analysis, so they keep the browser print flow.
+  // backend analysis, and a stale report's analysis is gone from the server, so
+  // both print the locally cached preview instead.
   const handleDownloadPdf = async (report: Report) => {
-    if (!report.id.startsWith('real-')) {
+    const state = reportState(report);
+    if (state === 'failed') return;
+    if (state === 'demo' || state === 'stale') {
       setPreviewReport(report);
       setTimeout(() => window.print(), 100);
       return;
@@ -227,6 +271,7 @@ export function ReportsPage() {
                   const analysis = getAnalysisById(report.analysisId);
                   const typeConfig = reportTypeConfig[report.type];
                   const Icon = typeConfig.icon;
+                  const state = reportState(report);
                   return (
                     <motion.div
                       key={report.id}
@@ -272,7 +317,17 @@ export function ReportsPage() {
                           <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${typeConfig.accent}`}>
                             <Icon size={18} />
                           </div>
-                          <Badge variant="success">Audit Ready</Badge>
+                          {state === 'failed' ? (
+                            <Badge variant="error">Failed</Badge>
+                          ) : state === 'stale' ? (
+                            <span title="This browser still has the report, but the server no longer has its analysis (for example after a server restart). Only the cached preview is available.">
+                              <Badge variant="warning">Not on server</Badge>
+                            </span>
+                          ) : report.status === 'generating' ? (
+                            <Badge variant="neutral">Processing</Badge>
+                          ) : (
+                            <Badge variant="success">Audit Ready</Badge>
+                          )}
                         </div>
                         <div className="mt-4 flex-1">
                           <h3 className="text-sm font-semibold text-ink-900 dark:text-slate-100">{report.title}</h3>
@@ -292,7 +347,7 @@ export function ReportsPage() {
                               <p className="text-xs font-medium text-ink-700 dark:text-slate-300">{report.author}</p>
                               <p className="flex items-center gap-1 text-xs text-ink-400 dark:text-slate-500">
                                 <Calendar size={11} />
-                                {formatDate(report.generatedAt)}
+                                {report.generatedAt ? formatDate(report.generatedAt) : 'Date unknown'}
                               </p>
                             </div>
                           </div>
@@ -303,8 +358,8 @@ export function ReportsPage() {
                         </div>
                         <div className="mt-4 grid grid-cols-3 gap-2">
                           <Button variant="secondary" size="sm" leftIcon={<Eye size={13} />} onClick={() => setPreviewReport(report)}>View</Button>
-                          <Button variant="secondary" size="sm" disabled={isDownloading === report.id} leftIcon={<Download size={13} />} onClick={(e) => { e.stopPropagation(); handleDownloadPdf(report); }}>{isDownloading === report.id ? '...' : 'PDF'}</Button>
-                          <Button variant="secondary" size="sm" disabled={isEmailing === report.id} leftIcon={<Send size={13} />} onClick={(e) => { e.stopPropagation(); handleEmailReport(report.id, report.analysisId); }}>{isEmailing === report.id ? '...' : 'Email'}</Button>
+                          <Button variant="secondary" size="sm" disabled={isDownloading === report.id || state === 'failed'} title={state === 'stale' ? 'Not on server — prints the cached preview' : undefined} leftIcon={<Download size={13} />} onClick={(e) => { e.stopPropagation(); handleDownloadPdf(report); }}>{isDownloading === report.id ? '...' : state === 'stale' ? 'Print' : 'PDF'}</Button>
+                          <Button variant="secondary" size="sm" disabled={isEmailing === report.id || state === 'failed' || state === 'stale'} title={state === 'stale' ? 'Not on server — email needs the server analysis' : undefined} leftIcon={<Send size={13} />} onClick={(e) => { e.stopPropagation(); handleEmailReport(report.id, report.analysisId); }}>{isEmailing === report.id ? '...' : 'Email'}</Button>
                         </div>
                       </Card>
                     </motion.div>
@@ -388,7 +443,7 @@ export function ReportsPage() {
                         <div className="mt-4 grid grid-cols-3 gap-2">
                           <Button variant="secondary" size="sm" leftIcon={<Eye size={13} />} onClick={() => setPreviewReport(report)}>View</Button>
                           <Button variant="secondary" size="sm" disabled={isDownloading === report.id} leftIcon={<Download size={13} />} onClick={(e) => { e.stopPropagation(); handleDownloadPdf(report); }}>{isDownloading === report.id ? '...' : 'PDF'}</Button>
-                          <Button variant="secondary" size="sm" disabled={isEmailing === report.id} leftIcon={<Send size={13} />} onClick={(e) => { e.stopPropagation(); handleEmailReport(report.id, report.analysisId); }}>{isEmailing === report.id ? '...' : 'Email'}</Button>
+                          <Button variant="secondary" size="sm" disabled title="Demo report — email needs a real analysis on the server" leftIcon={<Send size={13} />}>Demo</Button>
                         </div>
                       </Card>
                     </motion.div>
@@ -414,14 +469,19 @@ export function ReportsPage() {
       {/* Document-Style Report Preview Modal */}
       <AnimatePresence>
         {previewReport && (
-          <ReportPreviewModal report={previewReport} onClose={() => setPreviewReport(null)} isEmailing={isEmailing} handleEmailReport={handleEmailReport} isDownloading={isDownloading} handleDownloadPdf={handleDownloadPdf} />
+          <ReportPreviewModal report={previewReport} onClose={() => setPreviewReport(null)} isEmailing={isEmailing} handleEmailReport={handleEmailReport} isDownloading={isDownloading} handleDownloadPdf={handleDownloadPdf} state={reportState(previewReport)} />
         )}
       </AnimatePresence>
     </div>
   );
 }
 
-function ReportPreviewModal({ report, onClose, isEmailing, handleEmailReport, isDownloading, handleDownloadPdf }: { report: Report; onClose: () => void; isEmailing: string | null; handleEmailReport: (rId: string, aId: string) => void; isDownloading: string | null; handleDownloadPdf: (report: Report) => void }) {
+function ReportPreviewModal({ report, onClose, isEmailing, handleEmailReport, isDownloading, handleDownloadPdf, state }: { report: Report; onClose: () => void; isEmailing: string | null; handleEmailReport: (rId: string, aId: string) => void; isDownloading: string | null; handleDownloadPdf: (report: Report) => void; state: ReportState }) {
+  const emailBlockedReason =
+    state === 'demo' ? 'Demo report — email needs a real analysis on the server'
+    : state === 'stale' ? 'Not on server — email needs the server analysis'
+    : state === 'failed' ? 'The analysis failed; there is no report to send'
+    : undefined;
   const analysis = getAnalysisById(report.analysisId);
   
   // Dynamic Data Computation
@@ -476,19 +536,23 @@ function ReportPreviewModal({ report, onClose, isEmailing, handleEmailReport, is
             >
               Print
             </Button>
-            <Button
-              variant="secondary"
-              size="sm"
-              disabled={isDownloading === report.id}
-              leftIcon={<Download size={14} />}
-              onClick={() => handleDownloadPdf(report)}
-            >
-              {isDownloading === report.id ? 'Downloading...' : 'Export PDF'}
-            </Button>
+            {/* A stale or failed report has no server PDF; Print above uses the cached copy. */}
+            {state !== 'stale' && state !== 'failed' && (
+              <Button
+                variant="secondary"
+                size="sm"
+                disabled={isDownloading === report.id}
+                leftIcon={<Download size={14} />}
+                onClick={() => handleDownloadPdf(report)}
+              >
+                {isDownloading === report.id ? 'Downloading...' : 'Export PDF'}
+              </Button>
+            )}
             <Button
               variant="primary"
               size="sm"
-              disabled={isEmailing === report.id}
+              disabled={isEmailing === report.id || emailBlockedReason !== undefined}
+              title={emailBlockedReason}
               leftIcon={<Send size={13} />}
               onClick={() => handleEmailReport(report.id, report.analysisId)}
             >

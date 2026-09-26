@@ -240,7 +240,7 @@ export interface Report {
   generatedAt: string;
   format: string;
   pages: number;
-  status: 'ready' | 'generating' | 'draft';
+  status: 'ready' | 'generating' | 'draft' | 'failed';
   author: string;
 }
 
