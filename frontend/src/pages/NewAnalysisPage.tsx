@@ -341,6 +341,21 @@ function ProfileFieldCard({
     </div>
   );
 }
+
+// A failed analysis carries the backend's error_message, which names the stage
+// that failed (e.g. "[NO_EXTRACTED_TEXT] …"). Show it for diagnosis, but never
+// anything internal: no tracebacks, filesystem paths, URLs or key-like tokens.
+function describeServerFailure(raw: unknown): string | null {
+  if (typeof raw !== 'string') return null;
+  let msg = raw.trim();
+  if (!msg || /traceback|File "/i.test(msg)) return null;
+  msg = msg
+    .replace(/https?:\/\/[^\s)'"]+/g, '[url]')
+    .replace(/(?:[A-Za-z]:)?(?:[\\/][\w-]+(?:\.[\w-]+)*){3,}[\\/]?/g, '[path]')
+    .replace(/\b(?:sk|pk|AIza)[\w-]{8,}/g, '[redacted]');
+  return msg.length > 240 ? `${msg.slice(0, 240)}…` : msg;
+}
+
 export function NewAnalysisPage() {
   const { navigate } = useRouter();
 
@@ -509,7 +524,12 @@ export function NewAnalysisPage() {
       );
 
       if (final.status === 'failed') {
-        setSubmitError('The analysis service could not process this input. Try clearer specification text or a different document.');
+        const detail = describeServerFailure(final.error_message);
+        setSubmitError(
+          detail
+            ? `The analysis service could not process this input. Server reported: ${detail}`
+            : 'The analysis service could not process this input. Try clearer specification text or a different document.',
+        );
         setIsSubmitting(false);
         return;
       }
