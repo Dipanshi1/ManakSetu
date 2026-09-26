@@ -59,6 +59,24 @@ function mapStandardStatus(status = ''): StandardStatus {
   return 'current';
 }
 
+// Withdrawn and superseded standards are no longer citable, whatever their
+// retrieval score.
+export function isRetiredStandard(std: { status: StandardStatus }): boolean {
+  return std.status === 'withdrawn' || std.status === 'superseded';
+}
+
+// applicabilityScore is scaled per retrieval query (score / best score of that
+// query), so it ranks within a requirement but is not an absolute measure.
+export const RETRIEVAL_MATCH_TOOLTIP =
+  'Relative to the best catalogue match for the requirement that retrieved it; not an applicability score.';
+
+export function retrievalMatchLabel(score?: number | null): string | null {
+  if (score == null) return null;
+  if (score >= 100) return 'Top match';
+  if (score >= 70) return 'Strong';
+  return 'Partial';
+}
+
 function mapAnalysisStatus(status = ''): AnalysisStatus {
   const s = status.toLowerCase();
   if (s === 'completed' || s === 'partially_completed') return 'completed';
@@ -252,10 +270,13 @@ export function adaptAnalysis(raw: any): AdaptedAnalysis {
     }
   }
 
-  // Sort: primary = matched-requirement count (more is better);
-  // secondary = applicabilityScore (higher ML score is better).
+  // Sort: withdrawn/superseded standards last, so a retired standard can never be
+  // the primary code; then matched-requirement count (more is better);
+  // then applicabilityScore (higher ML score is better).
   // This prevents IS 1356 with 1 requirement from outranking IS 302 with 5.
   standards.sort((a, b) => {
+    const retiredDiff = Number(isRetiredStandard(a)) - Number(isRetiredStandard(b));
+    if (retiredDiff !== 0) return retiredDiff;
     const countDiff = (reqCountByStdId.get(b.id) || 0) - (reqCountByStdId.get(a.id) || 0);
     if (countDiff !== 0) return countDiff;
     return (b.applicabilityScore || 0) - (a.applicabilityScore || 0);

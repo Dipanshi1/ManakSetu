@@ -41,6 +41,7 @@ import type {
   StandardRelationshipRole,
 } from '@/data/types';
 import { StandardComparisonModal } from '@/components/standards/StandardComparisonModal';
+import { isRetiredStandard, retrievalMatchLabel, RETRIEVAL_MATCH_TOOLTIP } from '@/services/adapter';
 
 interface Props {
   analysis: Analysis;
@@ -277,6 +278,299 @@ export function AnalysisStandardsTab({ analysis, isReal = false, onSyncComplete 
     }
   };
 
+  const mainStandards = filtered.filter((s) => !isRetiredStandard(s));
+  const retiredStandards = filtered.filter(isRetiredStandard);
+
+  // superseded_by is an ID in the seeded demos but a designation such as
+  // "IS 302 : Part 2 : Sec 40" from the backend, while the successor's number
+  // carries its year ("…:2021"). Resolve against this analysis's standards only.
+  const designationKey = (d: string) => d.replace(/\s+/g, '').toLowerCase().replace(/:(19|20)\d{2}$/, '');
+  const findSuccessor = (supersededBy: string): Standard | undefined => {
+    const byId = matchedStandards.find((s) => s.id === supersededBy);
+    if (byId) return byId;
+    const key = designationKey(supersededBy);
+    return matchedStandards.find((s) => designationKey(s.number) === key) || getStandardById(supersededBy);
+  };
+
+  const renderStandardCard = (standard: Standard) => {
+    const isRejected = decisions[standard.id] === 'rejected';
+    if (isRejected) {
+      return (
+        <div key={standard.id} className="opacity-60 bg-ivory-50 border border-ink-200 rounded-lg p-3 flex justify-between items-center transition-opacity hover:opacity-100">
+          <div>
+            <span className="font-mono text-[11px] font-semibold text-ink-500 line-through mr-2">{standard.number}</span>
+            <span className="text-sm text-ink-400 line-through">{standard.title}</span>
+          </div>
+          <button onClick={() => handleDecision(standard.id, 'accepted')} className="text-[11px] font-semibold text-ink-500 hover:text-ink-800 flex items-center gap-1 bg-ivory-100 px-2 py-1 rounded">
+            <Undo2 size={12} /> Undo Reject
+          </button>
+        </div>
+      );
+    }
+    
+    const status = statusConfig[standard.status];
+    const hasIssue = standard.status !== 'current';
+    const retired = isRetiredStandard(standard);
+    // A retired standard is never presented as the primary code.
+    const role = retired && standard.relationshipRole === 'primary' ? 'related' : standard.relationshipRole;
+    const isPrimary = role === 'primary';
+    // Unsaved decisions display as accepted, except on a retired standard, where
+    // that would read as an endorsement nobody made.
+    const decision = decisions[standard.id] || (retired ? undefined : 'accepted');
+    const successor = standard.supersededBy ? findSuccessor(standard.supersededBy) : undefined;
+    // The BIS sync can store portal remarks ("DecidedbyCouncil") in superseded_by;
+    // only an unresolved value that reads as a designation is shown as a successor.
+    const successorText = standard.supersededBy && /^\s*(IS|IEC|ISO|SP)\b[^\d]*\d/i.test(standard.supersededBy)
+      ? standard.supersededBy
+      : undefined;
+    const matchLabel = retrievalMatchLabel(standard.applicabilityScore);
+
+    const standardReqs = allMatchedRequirements.filter(
+      (req) => req.standardId === standard.id || 
+               req.standardIds?.includes(standard.id) || 
+               req.standardCode.includes(standard.number.split(' ')[1] || '')
+    );
+
+    return (
+      <Card
+        key={standard.id}
+        padding="lg"
+        className={`transition-all ${
+          retired
+            ? 'bg-ivory-50 border-dashed border-ink-300'
+            : isPrimary
+            ? 'bg-white border-teal-300 ring-1 ring-teal-500/10 shadow-soft'
+            : 'bg-white border-ink-200 shadow-soft'
+        }`}
+      >
+        <div className="flex flex-col gap-4">
+          {/* Header row of standard item */}
+          <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+            <div className="flex items-start gap-3.5">
+              <div
+                className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg font-mono text-xs font-bold ${
+                  isPrimary
+                    ? 'bg-ink-900 text-teal-400'
+                    : hasIssue
+                    ? 'bg-warning-100 text-warning-800'
+                    : 'bg-ivory-100 text-ink-700'
+                }`}
+              >
+                {hasIssue ? <FileWarning size={18} /> : <BookMarked size={18} />}
+              </div>
+
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    onClick={() => navigate({ name: 'standard', standardId: standard.id, analysisId: analysis.id })}
+                    className="text-base font-semibold text-ink-900 hover:text-teal-700 flex items-center gap-1.5 font-mono"
+                  >
+                    {standard.number}
+                    <ExternalLink size={13} className="text-ink-400" />
+                  </button>
+                  {renderRelationshipBadge(role)}
+                  <Badge variant={status.variant}>{status.label}</Badge>
+                  {renderConfidenceBadge(standard.reviewConfidence)}
+                  {standard.regulatory && (
+                    <Badge variant="blue" icon={<ShieldCheck size={11} />}>
+                      Regulatory Order
+                    </Badge>
+                  )}
+                  {standard.isCertified && (
+                    <Badge variant="teal" icon={<CheckCircle2 size={11} />}>
+                      Scheme-I ISI
+                    </Badge>
+                  )}
+                </div>
+
+
+                <h3 className="mt-1 text-sm font-medium text-ink-800">{standard.title}</h3>
+              </div>
+            </div>
+
+            {/* Retrieval match & decision buttons */}
+            <div className="flex sm:flex-col items-center sm:items-end justify-between gap-1.5 shrink-0 border-t sm:border-t-0 pt-2 sm:pt-0 border-ink-100">
+              {!retired && (
+                <div className="text-right" title={RETRIEVAL_MATCH_TOOLTIP}>
+                  <span className="text-[10px] font-semibold uppercase tracking-wider text-ink-400 block font-sans">
+                    Retrieval match
+                  </span>
+                  <span className="text-sm font-bold text-ink-900">
+                    {matchLabel ?? '—'}
+                  </span>
+                </div>
+              )}
+
+              {/* Human Decision Buttons */}
+              <div className="flex items-center gap-1 text-xs">
+                <button
+                  onClick={() => handleDecision(standard.id, 'accepted')}
+                  className={`px-2 py-0.5 rounded text-[11px] font-medium transition-all ${
+                    decision === 'accepted'
+                      ? 'bg-success-600 text-white shadow-soft'
+                      : 'bg-ivory-100 text-ink-600 hover:bg-ivory-200'
+                  }`}
+                >
+                  <Check size={11} className="inline mr-0.5" />
+                  Accept
+                </button>
+                <button
+                  onClick={() => handleDecision(standard.id, 'reviewed')}
+                  className={`px-2 py-0.5 rounded text-[11px] font-medium transition-all ${
+                    decision === 'reviewed'
+                      ? 'bg-warning-500 text-white shadow-soft'
+                      : 'bg-ivory-100 text-ink-600 hover:bg-ivory-200'
+                  }`}
+                >
+                  <HelpCircle size={11} className="inline mr-0.5" />
+                  Review
+                </button>
+                <button
+                  onClick={() => handleDecision(standard.id, 'rejected')}
+                  className={`px-2 py-0.5 rounded text-[11px] font-medium transition-all ${
+                    decision === 'rejected'
+                      ? 'bg-error-600 text-white shadow-soft'
+                      : 'bg-ivory-100 text-ink-600 hover:bg-ivory-200'
+                  }`}
+                >
+                  <X size={11} className="inline mr-0.5" />
+                  Reject
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Structured Why it Applies Reasoning & Matched Requirements Badge */}
+          <div className="rounded-lg border border-ink-100 bg-ivory-50/60 p-3 text-xs">
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-1.5">
+              <span className="font-semibold text-ink-900 flex items-center gap-1.5 text-[11px] uppercase tracking-wider font-mono">
+                <Scale size={13} className="text-teal-700" />
+                {retired ? 'Why it was retrieved:' : 'Why it applies to this procurement:'}
+              </span>
+              <div className="flex items-center gap-1.5 font-mono text-[11px]">
+                {standardReqs.length > 0 && (
+                  <span className="text-teal-800 bg-teal-50 px-2 py-0.5 rounded border border-teal-200 flex items-center gap-1 font-semibold">
+                    <FileCheck2 size={11} />
+                    {standardReqs.length} matched requirement{standardReqs.length !== 1 ? 's' : ''}
+                  </span>
+                )}
+                {standard.evidenceAvailable && (
+                  <span className="text-teal-800 bg-teal-50 px-2 py-0.5 rounded border border-teal-200">
+                    Evidence Available
+                  </span>
+                )}
+              </div>
+            </div>
+
+            <p className="text-ink-700 leading-relaxed text-xs">
+              {standard.whyApplies || standard.summary}
+            </p>
+
+            {standard.whyAppliesReasons && standard.whyAppliesReasons.length > 0 && (
+              <div className="mt-2.5 grid gap-1.5 sm:grid-cols-2 pt-2 border-t border-ink-200/50">
+                {standard.whyAppliesReasons.map((r, idx) => (
+                  <div key={idx} className="flex items-start gap-1.5 text-[11px]">
+                    {r.matched ? (
+                      <CheckCircle2 size={12} className="mt-0.5 shrink-0 text-teal-600" />
+                    ) : (
+                      <AlertTriangle size={12} className="mt-0.5 shrink-0 text-warning-600" />
+                    )}
+                    <span>
+                      <strong className="text-ink-800 font-medium">{r.category}:</strong>{' '}
+                      <span className="text-ink-600">{r.description}</span>
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Metadata & Actions footer */}
+          <div className="flex flex-wrap items-center justify-between gap-2 border-t border-ink-100 pt-2.5 text-xs text-ink-500 font-mono">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              <span>Edition: {standard.edition} ({standard.revision})</span>
+              <span>·</span>
+              <span>Bureau: {standard.bureau} — {standard.section}</span>
+              {standard.committee && (
+                <>
+                  <span>·</span>
+                  <span>{standard.committee}</span>
+                </>
+              )}
+              {standard.ministry && (
+                <>
+                  <span>·</span>
+                  <span title={standard.ministry}>Gov</span>
+                </>
+              )}
+              {false && (
+                <>
+                  <span>·</span>
+                  <span title="International Classification for Standards">ICS: {standard.section}</span>
+                </>
+              )}
+              {(successor || successorText) && (
+                <>
+                  <span>·</span>
+                  {successor ? (
+                    <span className="text-warning-700 font-semibold cursor-pointer hover:underline" onClick={() => navigate({ name: 'standard', standardId: successor.id, analysisId: analysis.id })}>
+                       → Upgraded to {successor.number}
+                    </span>
+                  ) : (
+                    <span className="text-warning-700 font-semibold">
+                       → Upgraded to {successorText}
+                    </span>
+                  )}
+                </>
+              )}
+              <span>·</span>
+              {standard.pages > 0 && <span>{standard.pages} pages</span>}
+              {standard.amendments && standard.amendments.length > 0 && (
+                <>
+                  <span>·</span>
+                  <span className="text-ink-700">
+                    {standard.amendments.map((a: any) => typeof a === 'string' ? a : `Amd ${(a.amendment_number || a.number)}` + (a.year ? ` (${a.year})` : '')).join(', ')}
+                  </span>
+                </>
+              )}
+              {standard.retrievedAt && (
+                <>
+                  <span>·</span>
+                  <span>Verified: {standard.retrievedAt.slice(0, 10)}</span>
+                </>
+              )}
+              {standard.bisSourceUrl && (
+                <>
+                  <span>·</span>
+                  <a href={standard.bisSourceUrl === "https://standards.bis.gov.in" ? "https://www.services.bis.gov.in/php/BIS_2.0/bisconnect/knowyourstandards/indian_standards/isdetails" : standard.bisSourceUrl} title="Copy the IS number and paste it in the BIS search portal" target="_blank" rel="noopener noreferrer" className="text-teal-600 hover:underline">BIS Search Portal ↗</a>
+                </>
+              )}
+            </div>
+
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => {
+                  setCompareA(standard.id);
+                  setCompareB(standard.supersededBy || 'std-1944');
+                  setCompareModalOpen(true);
+                }}
+                className="font-sans font-medium text-ink-600 hover:text-ink-900 inline-flex items-center gap-1 text-xs"
+              >
+                <Columns size={12} /> Compare
+              </button>
+              <button
+                onClick={() => navigate({ name: 'standard', standardId: standard.id, analysisId: analysis.id })}
+                className="font-sans font-medium text-teal-700 hover:text-teal-900 inline-flex items-center gap-1 text-xs"
+              >
+                View details & clauses <ArrowRight size={13} />
+              </button>
+            </div>
+          </div>
+        </div>
+      </Card>
+    );
+  };
+
   return (
     <div className="space-y-4">
       {/* BIS Sync Status Bar */}
@@ -365,262 +659,26 @@ export function AnalysisStandardsTab({ analysis, isReal = false, onSyncComplete 
 
       {/* Standards list */}
       <div className="space-y-3.5">
-        {filtered.map((standard) => {
-          const isRejected = decisions[standard.id] === 'rejected';
-          if (isRejected) {
-            return (
-              <div key={standard.id} className="opacity-60 bg-ivory-50 border border-ink-200 rounded-lg p-3 flex justify-between items-center transition-opacity hover:opacity-100">
-                <div>
-                  <span className="font-mono text-[11px] font-semibold text-ink-500 line-through mr-2">{standard.number}</span>
-                  <span className="text-sm text-ink-400 line-through">{standard.title}</span>
-                </div>
-                <button onClick={() => handleDecision(standard.id, 'accepted')} className="text-[11px] font-semibold text-ink-500 hover:text-ink-800 flex items-center gap-1 bg-ivory-100 px-2 py-1 rounded">
-                  <Undo2 size={12} /> Undo Reject
-                </button>
-              </div>
-            );
-          }
-          
-          const status = statusConfig[standard.status];
-          const hasIssue = standard.status !== 'current';
-          const decision = decisions[standard.id] || 'accepted';
-
-          const standardReqs = allMatchedRequirements.filter(
-            (req) => req.standardId === standard.id || 
-                     req.standardIds?.includes(standard.id) || 
-                     req.standardCode.includes(standard.number.split(' ')[1] || '')
-          );
-
-          return (
-            <Card
-              key={standard.id}
-              padding="lg"
-              className={`bg-white transition-all ${
-                standard.relationshipRole === 'primary'
-                  ? 'border-teal-300 ring-1 ring-teal-500/10 shadow-soft'
-                  : 'border-ink-200 shadow-soft'
-              }`}
-            >
-              <div className="flex flex-col gap-4">
-                {/* Header row of standard item */}
-                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
-                  <div className="flex items-start gap-3.5">
-                    <div
-                      className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg font-mono text-xs font-bold ${
-                        standard.relationshipRole === 'primary'
-                          ? 'bg-ink-900 text-teal-400'
-                          : hasIssue
-                          ? 'bg-warning-100 text-warning-800'
-                          : 'bg-ivory-100 text-ink-700'
-                      }`}
-                    >
-                      {hasIssue ? <FileWarning size={18} /> : <BookMarked size={18} />}
-                    </div>
-
-                    <div>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <button
-                          onClick={() => navigate({ name: 'standard', standardId: standard.id, analysisId: analysis.id })}
-                          className="text-base font-semibold text-ink-900 hover:text-teal-700 flex items-center gap-1.5 font-mono"
-                        >
-                          {standard.number}
-                          <ExternalLink size={13} className="text-ink-400" />
-                        </button>
-                        {renderRelationshipBadge(standard.relationshipRole)}
-                        <Badge variant={status.variant}>{status.label}</Badge>
-                        {renderConfidenceBadge(standard.reviewConfidence)}
-                        {standard.regulatory && (
-                          <Badge variant="blue" icon={<ShieldCheck size={11} />}>
-                            Regulatory Order
-                          </Badge>
-                        )}
-                        {standard.isCertified && (
-                          <Badge variant="teal" icon={<CheckCircle2 size={11} />}>
-                            Scheme-I ISI
-                          </Badge>
-                        )}
-                      </div>
-
-
-                      <h3 className="mt-1 text-sm font-medium text-ink-800">{standard.title}</h3>
-                    </div>
-                  </div>
-
-                  {/* Retrieval match & decision buttons */}
-                  <div className="flex sm:flex-col items-center sm:items-end justify-between gap-1.5 shrink-0 border-t sm:border-t-0 pt-2 sm:pt-0 border-ink-100">
-                    <div className="text-right">
-                      <span className="text-[10px] font-semibold uppercase tracking-wider text-ink-400 block font-sans">
-                        Retrieval match
-                      </span>
-                      <span className="font-mono text-sm font-bold text-ink-900 tabular-nums">
-                        {standard.applicabilityScore != null ? `${standard.applicabilityScore}%` : '—'}
-                      </span>
-                    </div>
-
-                    {/* Human Decision Buttons */}
-                    <div className="flex items-center gap-1 text-xs">
-                      <button
-                        onClick={() => handleDecision(standard.id, 'accepted')}
-                        className={`px-2 py-0.5 rounded text-[11px] font-medium transition-all ${
-                          decision === 'accepted'
-                            ? 'bg-success-600 text-white shadow-soft'
-                            : 'bg-ivory-100 text-ink-600 hover:bg-ivory-200'
-                        }`}
-                      >
-                        <Check size={11} className="inline mr-0.5" />
-                        Accept
-                      </button>
-                      <button
-                        onClick={() => handleDecision(standard.id, 'reviewed')}
-                        className={`px-2 py-0.5 rounded text-[11px] font-medium transition-all ${
-                          decision === 'reviewed'
-                            ? 'bg-warning-500 text-white shadow-soft'
-                            : 'bg-ivory-100 text-ink-600 hover:bg-ivory-200'
-                        }`}
-                      >
-                        <HelpCircle size={11} className="inline mr-0.5" />
-                        Review
-                      </button>
-                      <button
-                        onClick={() => handleDecision(standard.id, 'rejected')}
-                        className={`px-2 py-0.5 rounded text-[11px] font-medium transition-all ${
-                          decision === 'rejected'
-                            ? 'bg-error-600 text-white shadow-soft'
-                            : 'bg-ivory-100 text-ink-600 hover:bg-ivory-200'
-                        }`}
-                      >
-                        <X size={11} className="inline mr-0.5" />
-                        Reject
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Structured Why it Applies Reasoning & Matched Requirements Badge */}
-                <div className="rounded-lg border border-ink-100 bg-ivory-50/60 p-3 text-xs">
-                  <div className="flex flex-wrap items-center justify-between gap-2 mb-1.5">
-                    <span className="font-semibold text-ink-900 flex items-center gap-1.5 text-[11px] uppercase tracking-wider font-mono">
-                      <Scale size={13} className="text-teal-700" />
-                      Why it applies to this procurement:
-                    </span>
-                    <div className="flex items-center gap-1.5 font-mono text-[11px]">
-                      {standardReqs.length > 0 && (
-                        <span className="text-teal-800 bg-teal-50 px-2 py-0.5 rounded border border-teal-200 flex items-center gap-1 font-semibold">
-                          <FileCheck2 size={11} />
-                          {standardReqs.length} matched requirement{standardReqs.length !== 1 ? 's' : ''}
-                        </span>
-                      )}
-                      {standard.evidenceAvailable && (
-                        <span className="text-teal-800 bg-teal-50 px-2 py-0.5 rounded border border-teal-200">
-                          Evidence Available
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  <p className="text-ink-700 leading-relaxed text-xs">
-                    {standard.whyApplies || standard.summary}
-                  </p>
-
-                  {standard.whyAppliesReasons && standard.whyAppliesReasons.length > 0 && (
-                    <div className="mt-2.5 grid gap-1.5 sm:grid-cols-2 pt-2 border-t border-ink-200/50">
-                      {standard.whyAppliesReasons.map((r, idx) => (
-                        <div key={idx} className="flex items-start gap-1.5 text-[11px]">
-                          {r.matched ? (
-                            <CheckCircle2 size={12} className="mt-0.5 shrink-0 text-teal-600" />
-                          ) : (
-                            <AlertTriangle size={12} className="mt-0.5 shrink-0 text-warning-600" />
-                          )}
-                          <span>
-                            <strong className="text-ink-800 font-medium">{r.category}:</strong>{' '}
-                            <span className="text-ink-600">{r.description}</span>
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* Metadata & Actions footer */}
-                <div className="flex flex-wrap items-center justify-between gap-2 border-t border-ink-100 pt-2.5 text-xs text-ink-500 font-mono">
-                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                    <span>Edition: {standard.edition} ({standard.revision})</span>
-                    <span>·</span>
-                    <span>Bureau: {standard.bureau} — {standard.section}</span>
-                    {standard.committee && (
-                      <>
-                        <span>·</span>
-                        <span>{standard.committee}</span>
-                      </>
-                    )}
-                    {standard.ministry && (
-                      <>
-                        <span>·</span>
-                        <span title={standard.ministry}>Gov</span>
-                      </>
-                    )}
-                    {false && (
-                      <>
-                        <span>·</span>
-                        <span title="International Classification for Standards">ICS: {standard.section}</span>
-                      </>
-                    )}
-                    {standard.supersededBy && (
-                      <>
-                        <span>·</span>
-                        <span className="text-warning-700 font-semibold cursor-pointer hover:underline" onClick={() => navigate({ name: 'standard', standardId: standard.supersededBy!, analysisId: analysis.id })}>
-                           → Upgraded to {getStandardById(standard.supersededBy!)?.number || standard.supersededBy}
-                        </span>
-                      </>
-                    )}
-                    <span>·</span>
-                    {standard.pages > 0 && <span>{standard.pages} pages</span>}
-                    {standard.amendments && standard.amendments.length > 0 && (
-                      <>
-                        <span>·</span>
-                        <span className="text-ink-700">
-                          {standard.amendments.map((a: any) => typeof a === 'string' ? a : `Amd ${(a.amendment_number || a.number)}` + (a.year ? ` (${a.year})` : '')).join(', ')}
-                        </span>
-                      </>
-                    )}
-                    {standard.retrievedAt && (
-                      <>
-                        <span>·</span>
-                        <span>Verified: {standard.retrievedAt.slice(0, 10)}</span>
-                      </>
-                    )}
-                    {standard.bisSourceUrl && (
-                      <>
-                        <span>·</span>
-                        <a href={standard.bisSourceUrl === "https://standards.bis.gov.in" ? "https://www.services.bis.gov.in/php/BIS_2.0/bisconnect/knowyourstandards/indian_standards/isdetails" : standard.bisSourceUrl} title="Copy the IS number and paste it in the BIS search portal" target="_blank" rel="noopener noreferrer" className="text-teal-600 hover:underline">BIS Search Portal ↗</a>
-                      </>
-                    )}
-                  </div>
-
-                  <div className="flex items-center gap-3">
-                    <button
-                      onClick={() => {
-                        setCompareA(standard.id);
-                        setCompareB(standard.supersededBy || 'std-1944');
-                        setCompareModalOpen(true);
-                      }}
-                      className="font-sans font-medium text-ink-600 hover:text-ink-900 inline-flex items-center gap-1 text-xs"
-                    >
-                      <Columns size={12} /> Compare
-                    </button>
-                    <button
-                      onClick={() => navigate({ name: 'standard', standardId: standard.id, analysisId: analysis.id })}
-                      className="font-sans font-medium text-teal-700 hover:text-teal-900 inline-flex items-center gap-1 text-xs"
-                    >
-                      View details & clauses <ArrowRight size={13} />
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </Card>
-          );
-        })}
+        {mainStandards.map(renderStandardCard)}
       </div>
+
+      {/* Withdrawn / superseded standards — retrieved, but no longer citable */}
+      {retiredStandards.length > 0 && (
+        <div className="space-y-3.5 border-t border-dashed border-ink-300 pt-4">
+          <div className="flex items-start gap-2">
+            <FileWarning size={15} className="mt-0.5 shrink-0 text-warning-700" />
+            <div>
+              <p className="text-sm font-semibold text-ink-900">
+                Withdrawn / Superseded ({retiredStandards.length})
+              </p>
+              <p className="text-xs text-ink-500">
+                Matched by catalogue search but no longer current. Shown for reference; not recommended for citation.
+              </p>
+            </div>
+          </div>
+          {retiredStandards.map(renderStandardCard)}
+        </div>
+      )}
 
       {/* Summary footer note */}
       <Card padding="md" className="mt-6 bg-ivory-100 border-ink-200">

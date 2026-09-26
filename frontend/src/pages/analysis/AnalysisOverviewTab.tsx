@@ -46,6 +46,7 @@ import type {
   Standard,
 } from '@/data/types';
 import { formatDate } from '@/utils/format';
+import { isRetiredStandard, retrievalMatchLabel, RETRIEVAL_MATCH_TOOLTIP } from '@/services/adapter';
 
 interface Props {
   analysis: Analysis;
@@ -62,7 +63,11 @@ export function AnalysisOverviewTab({ analysis, isReal = false }: Props) {
     .filter((s): s is Standard => s !== undefined)
     .filter((s) => !(analysis.standard_decisions && analysis.standard_decisions[s.id]?.decision === 'rejected'));
 
-  const primaryStandard = matchedStandards[0] || getStandardById(analysis.matchedStandardIds[0]);
+  // A withdrawn or superseded standard is never presented as the primary one.
+  const primaryCandidate = matchedStandards[0] || getStandardById(analysis.matchedStandardIds[0]);
+  const primaryStandard = primaryCandidate && isRetiredStandard(primaryCandidate)
+    ? matchedStandards.find((s) => !isRetiredStandard(s))
+    : primaryCandidate;
 
   const gaps = getGapsByAnalysisId(analysis.id);
   const relatedCount = getRelationshipsByAnalysisId(analysis.id).length;
@@ -258,23 +263,15 @@ export function AnalysisOverviewTab({ analysis, isReal = false }: Props) {
 
               {/* Retrieval Match & Human Decision Pill */}
               <div className="flex flex-col items-end gap-2 shrink-0">
-                <div className="flex items-center gap-2 rounded-lg bg-ivory-100/80 px-3 py-1.5 border border-ink-200/80">
+                <div className="flex items-center gap-2 rounded-lg bg-ivory-100/80 px-3 py-1.5 border border-ink-200/80" title={RETRIEVAL_MATCH_TOOLTIP}>
                   <div className="text-right">
                     <span className="block text-[10px] font-semibold uppercase tracking-wider text-ink-500">
                       Retrieval Match
                     </span>
-                    <span className="font-mono text-base font-bold text-ink-900 tabular-nums">
-                      {primaryStandard.applicabilityScore != null
-                        ? `${primaryStandard.applicabilityScore}%`
-                        : '—'}
+                    <span className="text-base font-bold text-ink-900">
+                      {retrievalMatchLabel(primaryStandard.applicabilityScore) ?? '—'}
                     </span>
                   </div>
-                  <div className="h-7 w-px bg-ink-200 mx-1" />
-                  <span className="text-[11px] text-teal-800 font-medium">
-                    {primaryStandard.applicabilityScore != null && primaryStandard.applicabilityScore >= 70
-                          ? 'Strong retrieval match'
-                          : 'Relevant retrieval match'}
-                  </span>
                 </div>
 
                 {/* Officer Review Actions */}

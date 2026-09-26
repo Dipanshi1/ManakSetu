@@ -265,12 +265,6 @@ export function AnalysisPage({ analysisId, tab }: Props) {
                 <span>{formatDate(analysis.createdAt)}</span>
                 <span>·</span>
                 <span>{analysis.documentCount} document{analysis.documentCount !== 1 ? 's' : ''}</span>
-                {analysis.confidence > 0 && (
-                  <>
-                    <span>·</span>
-                    <Badge variant="teal">{analysis.confidence}% avg. retrieval match</Badge>
-                  </>
-                )}
               </div>
             </div>
             <Button variant="secondary" size="sm" leftIcon={<ScrollText size={15} />} onClick={() => navigate({ name: 'reports' })}>
