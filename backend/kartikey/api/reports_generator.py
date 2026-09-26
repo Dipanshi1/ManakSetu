@@ -121,7 +121,10 @@ def generate_pdf_report(analysis_data: dict) -> bytes:
                 Paragraph(str(label).replace('_', ' ').title(), normal_style),
                 Paragraph(f.get('reason', ''), normal_style)
             ])
-        find_table = Table(find_data, colWidths=[130, 85, 80, 220])
+        # splitInRow lets a row taller than a page (a long tender clause in the
+        # requirement column) continue on the next page instead of raising
+        # LayoutError.
+        find_table = Table(find_data, colWidths=[130, 85, 80, 220], splitInRow=1)
         find_table.setStyle(TableStyle([
             ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#f3f4f6')),
             ('TEXTCOLOR', (0,0), (-1,0), colors.HexColor('#1f2937')),
