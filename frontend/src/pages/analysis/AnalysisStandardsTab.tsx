@@ -160,7 +160,7 @@ export function AnalysisStandardsTab({ analysis, isReal = false, onSyncComplete 
     try {
       const { patchStandardDecision } = await import('@/services/api');
       await patchStandardDecision(analysis.id, stdId, decision);
-      
+
       // Mutate the global analysis object so the state persists if the user switches tabs and comes back
       if (!analysis.standard_decisions) {
         analysis.standard_decisions = {};
@@ -195,12 +195,12 @@ export function AnalysisStandardsTab({ analysis, isReal = false, onSyncComplete 
       return false;
     }
     if (filter === 'rejected') return decisions[s.id] === 'rejected';
-    
+
     // Hide rejected standards from other tabs (except 'all')
     if (decisions[s.id] === 'rejected' && filter !== 'all') {
       return false;
     }
-    
+
     if (filter === 'primary') return s.relationshipRole === 'primary';
     if (filter === 'issues') return s.status !== 'current' || s.reviewConfidence === 'needs-review';
     return true;
@@ -307,7 +307,7 @@ export function AnalysisStandardsTab({ analysis, isReal = false, onSyncComplete 
         </div>
       );
     }
-    
+
     const status = statusConfig[standard.status];
     const hasIssue = standard.status !== 'current';
     const retired = isRetiredStandard(standard);
@@ -326,8 +326,8 @@ export function AnalysisStandardsTab({ analysis, isReal = false, onSyncComplete 
     const matchLabel = retrievalMatchLabel(standard.applicabilityScore);
 
     const standardReqs = allMatchedRequirements.filter(
-      (req) => req.standardId === standard.id || 
-               req.standardIds?.includes(standard.id) || 
+      (req) => req.standardId === standard.id ||
+               req.standardIds?.includes(standard.id) ||
                req.standardCode.includes(standard.number.split(' ')[1] || '')
     );
 
