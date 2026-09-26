@@ -19,6 +19,7 @@ import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Card } from '@/components/ui/Card';
 import { useRouter } from '@/router';
+import { useAuth } from '@/auth/AuthContext';
 
 // Hero animation variants
 const heroContainerVariants: Variants = {
@@ -46,6 +47,7 @@ const heroItemVariants: Variants = {
 
 export function LandingPage() {
   const { navigate } = useRouter();
+  const { isAuthenticated } = useAuth();
   const [heroActiveTab, setHeroActiveTab] = useState<'standards' | 'issues' | 'profile' | 'evidence'>('standards');
 
   return (
@@ -101,7 +103,7 @@ export function LandingPage() {
             >
               <Button
                 size="lg"
-                onClick={() => navigate({ name: 'new-analysis' })}
+                onClick={() => navigate(isAuthenticated ? { name: 'new-analysis' } : { name: 'signin', redirect: '/new-analysis' })}
                 rightIcon={<ArrowRight size={17} />}
                 className="shadow-card active:scale-[0.98] transition-transform"
               >
@@ -488,7 +490,7 @@ export function LandingPage() {
                   Clause-level evidence mapped to 7 applicable standards & 4 normative references
                 </span>
                 <button
-                  onClick={() => navigate({ name: 'analysis', analysisId: 'an-001' })}
+                  onClick={() => navigate(isAuthenticated ? { name: 'analysis', analysisId: 'an-001' } : { name: 'signin', redirect: '/analysis/an-001' })}
                   className="font-medium text-teal-700 hover:text-teal-900 inline-flex items-center gap-1"
                 >
                   Open full workspace analysis <ArrowRight size={13} />
@@ -916,7 +918,7 @@ export function LandingPage() {
             <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
               <Button
                 size="lg"
-                onClick={() => navigate({ name: 'new-analysis' })}
+                onClick={() => navigate(isAuthenticated ? { name: 'new-analysis' } : { name: 'signin', redirect: '/new-analysis' })}
                 rightIcon={<ArrowRight size={17} />}
                 className="shadow-card active:scale-[0.98] transition-transform"
               >

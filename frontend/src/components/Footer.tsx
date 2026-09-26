@@ -1,13 +1,27 @@
 import { Logo } from './Logo';
 import { useRouter, type Route } from '@/router';
+import { useAuth } from '@/auth/AuthContext';
 
 export function Footer() {
   const { navigate } = useRouter();
+  const { isAuthenticated } = useAuth();
 
-  const productLinks: { label: string; route?: Route }[] = [
-    { label: 'Workspace', route: { name: 'workspace' } },
-    { label: 'Standards', route: { name: 'standards' } },
-    { label: 'Reports', route: { name: 'reports' } },
+  const handleProductNavigation = (name: 'workspace' | 'standards' | 'reports') => {
+    if (name === 'standards') {
+      navigate({ name: 'standards' });
+      return;
+    }
+    if (isAuthenticated) {
+      navigate({ name });
+    } else {
+      navigate({ name: 'signin', redirect: `/${name}` });
+    }
+  };
+
+  const productLinks: { label: string; name: 'workspace' | 'standards' | 'reports' }[] = [
+    { label: 'Workspace', name: 'workspace' },
+    { label: 'Standards', name: 'standards' },
+    { label: 'Reports', name: 'reports' },
   ];
 
   const resourceLinks: { label: string; route?: Route; href?: string }[] = [
@@ -51,7 +65,7 @@ export function Footer() {
                 {productLinks.map((item) => (
                   <li key={item.label}>
                     <button
-                      onClick={() => item.route && navigate(item.route)}
+                      onClick={() => handleProductNavigation(item.name)}
                       className="text-xs text-ink-600 transition-colors hover:text-ink-900 text-left dark:text-slate-400 dark:hover:text-white"
                     >
                       {item.label}
@@ -118,7 +132,7 @@ export function Footer() {
           <div className="flex items-center gap-4">
             <button onClick={() => navigate({ name: 'how-it-works' })} className="hover:text-ink-700 dark:hover:text-slate-300">How It Works</button>
             <span className="text-ink-300 dark:text-slate-700">|</span>
-            <button onClick={() => navigate({ name: 'workspace' })} className="hover:text-ink-700 dark:hover:text-slate-300">Workspace</button>
+            <button onClick={() => handleProductNavigation('workspace')} className="hover:text-ink-700 dark:hover:text-slate-300">Workspace</button>
             <span className="text-ink-300 dark:text-slate-700">|</span>
             <button onClick={() => navigate({ name: 'standards' })} className="hover:text-ink-700 dark:hover:text-slate-300">Standards</button>
           </div>

@@ -25,6 +25,7 @@ import { Logo } from './Logo';
 import { Avatar } from './ui/Avatar';
 import { useRouter, type Route } from '@/router';
 import { useTheme } from '@/theme/ThemeContext';
+import { useAuth } from '@/auth/AuthContext';
 
 interface TopNavProps {
   variant?: 'public' | 'app' | 'auth';
@@ -79,17 +80,20 @@ const mockNotifications: MockNotification[] = [
   },
 ];
 
-export function TopNav({ variant = 'public' }: TopNavProps) {
+export function TopNav({ variant }: TopNavProps) {
   const { route, navigate } = useRouter();
   const { theme, toggleTheme } = useTheme();
+  const { isAuthenticated, user, logout } = useAuth();
   const [searchOpen, setSearchOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [shortcutsModalOpen, setShortcutsModalOpen] = useState(false);
 
-  const isPublic = variant === 'public';
-  const isAuth = variant === 'auth';
+  // If explicitly 'auth', stay 'auth'. Otherwise, authenticated visitors get 'app' and unauthenticated get 'public'.
+  const resolvedVariant = variant === 'auth' ? 'auth' : (isAuthenticated ? 'app' : 'public');
+  const isPublic = resolvedVariant === 'public';
+  const isAuth = resolvedVariant === 'auth';
 
   // Global shortcut for Search Palette (⌘K / Ctrl+K)
   useEffect(() => {
@@ -186,7 +190,7 @@ export function TopNav({ variant = 'public' }: TopNavProps) {
                 Sign In
               </button>
               <button
-                onClick={() => navigate({ name: 'new-analysis' })}
+                onClick={() => navigate(isAuthenticated ? { name: 'new-analysis' } : { name: 'signin', redirect: '/new-analysis' })}
                 className="btn-primary px-3.5 py-1.5 text-xs font-medium shadow-soft"
               >
                 <Sparkles size={14} className="text-teal-300" />
@@ -327,7 +331,7 @@ export function TopNav({ variant = 'public' }: TopNavProps) {
                   aria-expanded={profileOpen}
                   aria-label="Open profile menu"
                 >
-                  <Avatar initials="PN" size="sm" />
+                  <Avatar initials={user?.initials || 'PN'} size="sm" />
                   <ChevronDown size={13} className="hidden text-ink-400 sm:block dark:text-slate-500" />
                 </button>
 
@@ -344,9 +348,9 @@ export function TopNav({ variant = 'public' }: TopNavProps) {
                       >
                         {/* User Identity Header */}
                         <div className="border-b border-ink-100 px-3 py-2.5 dark:border-slate-800">
-                          <p className="text-xs font-bold text-ink-900 dark:text-white">Priya Nair</p>
-                          <p className="text-[11px] text-ink-500 dark:text-slate-400 font-medium">Lead Procurement Officer</p>
-                          <p className="text-[10px] text-ink-400 font-mono dark:text-slate-500">Urban Infrastructure Division</p>
+                          <p className="text-xs font-bold text-ink-900 dark:text-white">{user?.name || 'Priya Nair'}</p>
+                          <p className="text-[11px] text-ink-500 dark:text-slate-400 font-medium">{user?.role || 'Lead Procurement Officer'}</p>
+                          <p className="text-[10px] text-ink-400 font-mono dark:text-slate-500">{user?.division || 'Urban Infrastructure Division'}</p>
                         </div>
 
                         {/* Account & Preferences Items */}
@@ -354,7 +358,7 @@ export function TopNav({ variant = 'public' }: TopNavProps) {
                           <button
                             onClick={() => {
                               setProfileOpen(false);
-                              alert('Officer Profile: Priya Nair (Ref #PO-88219)\nAuthorized for Technical Evaluation under SIH 26108.');
+                              alert(`Officer Profile: ${user?.name || 'Priya Nair'} (Demo Session)\nTechnical Evaluation testing under SIH 26108.`);
                             }}
                             className="flex w-full items-center gap-2.5 rounded-md px-3 py-1.5 text-xs text-ink-700 hover:bg-ink-100 hover:text-ink-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white"
                           >
@@ -401,6 +405,7 @@ export function TopNav({ variant = 'public' }: TopNavProps) {
                           <button
                             onClick={() => {
                               setProfileOpen(false);
+                              logout();
                               navigate({ name: 'signin' });
                             }}
                             className="flex w-full items-center gap-2.5 rounded-md px-3 py-1.5 text-xs text-error-600 hover:bg-error-50 dark:text-rose-400 dark:hover:bg-rose-950/40"
@@ -481,7 +486,7 @@ export function TopNav({ variant = 'public' }: TopNavProps) {
                 <button
                   onClick={() => {
                     setMobileMenuOpen(false);
-                    navigate({ name: 'new-analysis' });
+                    navigate(isAuthenticated ? { name: 'new-analysis' } : { name: 'signin', redirect: '/new-analysis' });
                   }}
                   className="btn-primary flex-1 py-1.5 text-xs"
                 >
