@@ -37,3 +37,4 @@ python-dotenv>=1.0.0
 pytest>=8.0.0
 pytest-asyncio>=0.23.0
 reportlab==5.0.1
+uharfbuzz>=0.56.0,<1.0.0
