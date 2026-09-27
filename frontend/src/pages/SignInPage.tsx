@@ -40,7 +40,7 @@ export function SignInPage() {
             </div>
             <h1 className="text-2xl font-bold tracking-tight text-ink-900 dark:text-white">Welcome back</h1>
             <p className="mt-2 text-sm text-ink-500 dark:text-slate-400">
-              {redirectTarget ? 'Sign in to continue' : 'Sign in to continue to your StandIQ workspace'}
+              {redirectTarget ? 'Sign in to continue' : 'Sign in to continue to your ManakSetu workspace'}
             </p>
           </div>
 

@@ -52,7 +52,7 @@ export function HowItWorksPage() {
       title: 'Procurement Input',
       subtitle: 'Multi-modal specification intake with section hierarchy preservation',
       description:
-        'Upload tender notices (NIT), Bills of Quantities (BOQ), Requests for Proposal (RFP), or technical schedules in PDF/DOCX format, or paste raw specification clauses. StandIQ preserves tabular structures, clause numbering, and section hierarchy.',
+        'Upload tender notices (NIT), Bills of Quantities (BOQ), Requests for Proposal (RFP), or technical schedules in PDF/DOCX format, or paste raw specification clauses. ManakSetu preserves tabular structures, clause numbering, and section hierarchy.',
       points: [
         'Supports PDF, DOCX, and TXT procurement documents up to 50 MB',
         'Extracts structured technical parameters, tolerances, and BOQ items',
@@ -83,7 +83,7 @@ export function HowItWorksPage() {
       title: 'Requirement Understanding',
       subtitle: 'Deconstruct scope, taxonomy, operational parameters & safety limits',
       description:
-        'StandIQ parses the tender text to understand the physical product classification, operational environment, electrical thresholds, photometric requirements, and safety conditions while filtering out standard administrative boilerplate.',
+        'ManakSetu parses the tender text to understand the physical product classification, operational environment, electrical thresholds, photometric requirements, and safety conditions while filtering out standard administrative boilerplate.',
       points: [
         'Discovers product taxonomy and application scope',
         'Isolates operating conditions (ambient temperature, humidity, ingress rating)',
@@ -141,7 +141,7 @@ export function HowItWorksPage() {
       title: 'Standards Intelligence',
       subtitle: 'Identify applicable Indian Standards & normative companion webs',
       description:
-        'The procurement profile is matched against indexed Indian Standards (IS codes), Bureau of Indian Standards (BIS) specifications, and harmonized international standards. StandIQ surfaces primary governing standards and secondary normative companions.',
+        'The procurement profile is matched against indexed Indian Standards (IS codes), Bureau of Indian Standards (BIS) specifications, and harmonized international standards. ManakSetu surfaces primary governing standards and secondary normative companions.',
       points: [
         'Discovers governing codes across Electrical, Mechanical, and Civil bureaus',
         'Traverses normative reference companion webs (driver safety, performance, testing)',
@@ -169,7 +169,7 @@ export function HowItWorksPage() {
       title: 'Applicability Reasoning',
       subtitle: 'Transparent, evidence-backed evaluation of why each standard applies',
       description:
-        'StandIQ answers "Why does this standard apply?" with a transparent multi-parameter reasoning engine. It validates scope alignment, product taxonomy match, environmental parameter compatibility, and current edition status.',
+        'ManakSetu answers "Why does this standard apply?" with a transparent multi-parameter reasoning engine. It validates scope alignment, product taxonomy match, environmental parameter compatibility, and current edition status.',
       points: [
         'Calculates 91% applicability match based on technical parameter alignment',
         'Validates optical, electrical, and mechanical scope compatibility',
@@ -206,7 +206,7 @@ export function HowItWorksPage() {
       title: 'Version Intelligence',
       subtitle: 'Detect withdrawn editions, reaffirmation years & supersession history',
       description:
-        'A standard must never be evaluated in isolation from its lifecycle. StandIQ traces the full BIS chronology from origin codes through published amendments to the current reaffirmed edition.',
+        'A standard must never be evaluated in isolation from its lifecycle. ManakSetu traces the full BIS chronology from origin codes through published amendments to the current reaffirmed edition.',
       points: [
         'Flags citations of withdrawn codes (e.g. obsolete IS 1944:1981 in NIT §4.2)',
         'Tracks published amendments (Amendment 1 & 2 incorporated)',
@@ -256,7 +256,7 @@ export function HowItWorksPage() {
       title: 'Regulatory & Certification',
       subtitle: 'Mandatory technical orders, MeitY CRS, BIS Scheme-I & NABL testing',
       description:
-        'StandIQ validates compulsory statutory compliance orders, laboratory accreditation mandates, BEE star energy labeling guidelines, and public procurement local content policies (PPP-MII).',
+        'ManakSetu validates compulsory statutory compliance orders, laboratory accreditation mandates, BEE star energy labeling guidelines, and public procurement local content policies (PPP-MII).',
       points: [
         'Surfaces mandatory MeitY Compulsory Registration Scheme (CRS) schedules',
         'Validates BIS Product Certification (Scheme-I ISI Mark)',
@@ -325,7 +325,7 @@ export function HowItWorksPage() {
         content: (
           <div className="rounded border border-ink-200 bg-white p-2.5 shadow-xs text-xs dark:border-slate-800 dark:bg-[#111827]">
             <div className="flex items-center justify-between font-mono text-[11px]">
-              <span className="font-bold text-ink-900 dark:text-white">STANDIQ-EVAL-2024-001</span>
+              <span className="font-bold text-ink-900 dark:text-white">MANAKSETU-EVAL-2024-001</span>
               <span className="text-teal-700 dark:text-teal-400 font-semibold">14 Pages · Verified</span>
             </div>
             <p className="text-[11px] text-ink-500 dark:text-slate-400 font-sans mt-0.5">Official Brief for Tender Evaluation Committee · NIT #MCD-2024-LT-09</p>
@@ -347,7 +347,7 @@ export function HowItWorksPage() {
             SIH Problem Statement 26108 Architecture
           </Badge>
           <h1 className="text-balance text-3xl font-bold tracking-tight text-ink-900 sm:text-4xl md:text-5xl dark:text-white">
-            How StandIQ turns procurement input into defensible decisions
+            How ManakSetu turns procurement input into defensible decisions
           </h1>
           <p className="mx-auto mt-4 max-w-2xl text-base leading-relaxed text-ink-600 dark:text-slate-400 sm:text-lg">
             Follow one tender from requirement extraction to standards intelligence, evidence and human review.

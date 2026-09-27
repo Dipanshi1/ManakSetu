@@ -903,7 +903,7 @@ export function AnalysisGapsTab({ analysisId, analysis, onSyncComplete }: Props)
       <div className="rounded-lg border border-ink-200 bg-ivory-100 p-3 text-xs text-ink-600 flex items-start gap-2.5">
         <Info size={15} className="mt-0.5 shrink-0 text-ink-500" />
         <p className="leading-relaxed">
-          StandIQ provides decision support based on indexed standard clauses and tender text extractions.
+          ManakSetu provides decision support based on indexed standard clauses and tender text extractions.
           Final procurement judgment remains with the officer.
         </p>
       </div>

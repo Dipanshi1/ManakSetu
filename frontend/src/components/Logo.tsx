@@ -43,7 +43,7 @@ export function Logo({ size = 'md', showWordmark = true, className = '' }: LogoP
       </div>
       {showWordmark && (
         <span className={`font-semibold tracking-tight text-ink-900 ${s.text}`}>
-          Stand<span className="text-teal-600">IQ</span>
+          Manak<span className="text-teal-600">Setu</span>
         </span>
       )}
     </div>

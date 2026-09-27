@@ -906,7 +906,7 @@ export function NewAnalysisPage() {
                     className="input font-mono text-xs leading-relaxed"
                   />
                   <p className="text-[11px] text-ink-400">
-                    Tip: StandIQ parses technical parameters, environmental constraints, and compliance mandates automatically.
+                    Tip: ManakSetu parses technical parameters, environmental constraints, and compliance mandates automatically.
                   </p>
                 </div>
               )}
@@ -934,7 +934,7 @@ export function NewAnalysisPage() {
                     className="input text-xs leading-relaxed"
                   />
                   <p className="text-[11px] text-ink-400">
-                    StandIQ extracts the product entity, electrical/mechanical parameters, and testing prerequisites from your description.
+                    ManakSetu extracts the product entity, electrical/mechanical parameters, and testing prerequisites from your description.
                   </p>
                 </div>
               )}
@@ -1047,7 +1047,7 @@ export function NewAnalysisPage() {
               <div>
                 <span className="font-semibold text-teal-900">Review detected requirements before continuing:</span>
                 <span className="text-ink-600 ml-1">
-                  StandIQ structures parameters extracted from your input. You can modify any value, add missing thresholds, or adjust criteria to guide accurate standards matching.
+                  ManakSetu structures parameters extracted from your input. You can modify any value, add missing thresholds, or adjust criteria to guide accurate standards matching.
                 </span>
               </div>
             </div>

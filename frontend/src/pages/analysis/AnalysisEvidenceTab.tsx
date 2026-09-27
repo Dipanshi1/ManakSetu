@@ -572,7 +572,7 @@ export function AnalysisEvidenceTab({ analysis }: Props) {
       <div className="rounded-lg border border-ink-200 bg-ivory-100 p-3 text-xs text-ink-600 flex items-start gap-2.5">
         <Info size={15} className="mt-0.5 shrink-0 text-ink-500" />
         <p className="leading-relaxed">
-          StandIQ provides decision support based on indexed tender extractions and BIS standard cross-referencing.
+          ManakSetu provides decision support based on indexed tender extractions and BIS standard cross-referencing.
           Final procurement judgment remains with the officer.
         </p>
       </div>

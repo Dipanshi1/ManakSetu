@@ -47,7 +47,7 @@ export function Footer() {
               <Logo size="md" />
             </button>
             <p className="mt-3 text-xs leading-relaxed text-ink-500 max-w-sm dark:text-slate-400">
-              StandIQ is a unified procurement intelligence workspace. We help technical evaluation committees
+              ManakSetu is a unified procurement intelligence workspace. We help technical evaluation committees
               and procurement officers analyze tender specifications, discover applicable Indian Standards,
               detect version gaps, and verify evidence.
             </p>
@@ -111,7 +111,7 @@ export function Footer() {
                       href={item.href}
                       onClick={(e) => {
                         e.preventDefault();
-                        alert(`${item.label} Policy — StandIQ SIH 26108 Evaluation.`);
+                        alert(`${item.label} Policy — ManakSetu SIH 26108 Evaluation.`);
                       }}
                       className="text-xs text-ink-600 transition-colors hover:text-ink-900 dark:text-slate-400 dark:hover:text-white"
                     >
@@ -127,7 +127,7 @@ export function Footer() {
         {/* Bottom bar */}
         <div className="mt-12 flex flex-col items-center justify-between gap-4 border-t border-ink-200/80 pt-6 sm:flex-row text-[11px] text-ink-400 dark:border-slate-800 dark:text-slate-500">
           <p>
-            © {new Date().getFullYear()} StandIQ. Built for SIH Problem Statement 26108 · Indian Standards references derived from indexed standards catalog.
+            © {new Date().getFullYear()} ManakSetu. Built for SIH Problem Statement 26108 · Indian Standards references derived from indexed standards catalog.
           </p>
           <div className="flex items-center gap-4">
             <button onClick={() => navigate({ name: 'how-it-works' })} className="hover:text-ink-700 dark:hover:text-slate-300">How It Works</button>

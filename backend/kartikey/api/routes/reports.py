@@ -124,7 +124,7 @@ async def get_pdf_report(analysis_id: str):
         content=pdf_bytes,
         media_type="application/pdf",
         headers={
-            "Content-Disposition": f'attachment; filename="StandIQ-Report-{analysis_id}.pdf"'
+            "Content-Disposition": f'attachment; filename="ManakSetu-Report-{analysis_id}.pdf"'
         }
     )
 
@@ -161,7 +161,7 @@ async def email_pdf_report(analysis_id: str, request: EmailReportRequest):
     try:
         async with httpx.AsyncClient() as client:
             files = {
-                "report_pdf": ("StandIQ-Report.pdf", pdf_bytes, "application/pdf")
+                "report_pdf": ("ManakSetu-Report.pdf", pdf_bytes, "application/pdf")
             }
             data = {
                 "tender_title": str(tender_title),

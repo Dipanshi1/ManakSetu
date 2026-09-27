@@ -109,7 +109,7 @@ export function TopNav({ variant }: TopNavProps) {
 
   // Public Navigation Links
   const publicNavLinks: { label: string; route: Route; active: boolean }[] = [
-    { label: 'StandIQ', route: { name: 'landing' }, active: route.name === 'landing' },
+    { label: 'ManakSetu', route: { name: 'landing' }, active: route.name === 'landing' },
     { label: 'How It Works', route: { name: 'how-it-works' }, active: route.name === 'how-it-works' },
     { label: 'Standards', route: { name: 'standards' }, active: route.name === 'standards' || route.name === 'standard' },
   ];
@@ -132,7 +132,7 @@ export function TopNav({ variant }: TopNavProps) {
           <button
             onClick={() => navigate(isPublic || isAuth ? { name: 'landing' } : { name: 'workspace' })}
             className="flex items-center text-left transition-opacity hover:opacity-85 focus:outline-none"
-            aria-label="StandIQ Home"
+            aria-label="ManakSetu Home"
           >
             <Logo size="md" />
           </button>

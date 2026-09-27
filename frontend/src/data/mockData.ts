@@ -1343,7 +1343,7 @@ export const reports: Report[] = [
     format: 'PDF',
     pages: 12,
     status: 'ready',
-    author: 'StandIQ Intelligence Engine',
+    author: 'ManakSetu Intelligence Engine',
   },
   {
     id: 'rep-002',
@@ -1354,7 +1354,7 @@ export const reports: Report[] = [
     format: 'PDF',
     pages: 8,
     status: 'ready',
-    author: 'StandIQ Intelligence Engine',
+    author: 'ManakSetu Intelligence Engine',
   },
   {
     id: 'rep-003',
@@ -1365,7 +1365,7 @@ export const reports: Report[] = [
     format: 'PDF',
     pages: 8,
     status: 'ready',
-    author: 'StandIQ Intelligence Engine',
+    author: 'ManakSetu Intelligence Engine',
   },
 ];
 

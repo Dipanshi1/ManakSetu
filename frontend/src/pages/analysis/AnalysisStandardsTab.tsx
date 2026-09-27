@@ -687,7 +687,7 @@ export function AnalysisStandardsTab({ analysis, isReal = false, onSyncComplete 
           <div className="text-xs text-ink-700 leading-relaxed">
             <p className="font-semibold text-ink-900">Procurement Officer Advisory</p>
             <p className="mt-0.5">
-              StandIQ provides source-backed evidence and clause mapping to support your specification decisions.
+              ManakSetu provides source-backed evidence and clause mapping to support your specification decisions.
               All recommendations require official review before final incorporation into Tender corrigenda or evaluation matrices.
             </p>
           </div>

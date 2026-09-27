@@ -26,7 +26,7 @@ def generate_pdf_report(analysis_data: dict) -> bytes:
     elements = []
     
     # Title
-    elements.append(Paragraph("StandIQ Technical Procurement Report", title_style))
+    elements.append(Paragraph("ManakSetu Technical Procurement Report", title_style))
     elements.append(Spacer(1, 10))
     
     # Meta Info

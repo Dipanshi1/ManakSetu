@@ -70,7 +70,7 @@ export function LandingPage() {
             {/* Header Badge */}
             <motion.div variants={heroItemVariants} className="mb-6 inline-flex items-center gap-2 rounded-full border border-ink-200/90 bg-white/90 px-3.5 py-1 text-xs font-medium text-ink-700 shadow-soft backdrop-blur-sm">
               <span className="flex h-2 w-2 rounded-full bg-teal-500" />
-              <span className="font-semibold text-ink-900">StandIQ</span>
+              <span className="font-semibold text-ink-900">ManakSetu</span>
               <span className="text-ink-300">|</span>
               <span>Procurement Intelligence Workspace</span>
             </motion.div>
@@ -606,7 +606,7 @@ export function LandingPage() {
                 Standards & version intelligence
               </h2>
               <p className="mt-3 text-sm leading-relaxed text-ink-600">
-                Never cite superseded standards or miss newly published amendments. StandIQ maps the full
+                Never cite superseded standards or miss newly published amendments. ManakSetu maps the full
                 evolution of Indian Standards, tracking revisions, reaffirmation years, active amendments, and
                 normative companion webs.
               </p>
@@ -746,7 +746,7 @@ export function LandingPage() {
               </h2>
               <p className="mt-3 text-sm leading-relaxed text-ink-600">
                 Identify under-specified parameters, conflicting clauses, and missing safety thresholds before
-                tenders are released. StandIQ translates standard requirements into concrete specification adjustments.
+                tenders are released. ManakSetu translates standard requirements into concrete specification adjustments.
               </p>
               <ul className="mt-5 space-y-2 text-xs text-ink-700">
                 <li className="flex items-center gap-2">
@@ -779,7 +779,7 @@ export function LandingPage() {
                 Evidence & provenance trail
               </h2>
               <p className="mt-3 text-sm leading-relaxed text-ink-600">
-                Every conclusion is tethered to verifiable evidence. StandIQ links your tender clauses directly
+                Every conclusion is tethered to verifiable evidence. ManakSetu links your tender clauses directly
                 to official standard paragraphs, laboratory testing mandates, and regulatory orders.
               </p>
               <ul className="mt-5 space-y-2 text-xs text-ink-700">
@@ -857,7 +857,7 @@ export function LandingPage() {
               Engineered for rigorous procurement governance
             </h2>
             <p className="mt-3 text-base text-ink-600">
-              StandIQ provides technical evaluation committees with defensible intelligence that stands up to audits and vendor queries.
+              ManakSetu provides technical evaluation committees with defensible intelligence that stands up to audits and vendor queries.
             </p>
           </div>
 
