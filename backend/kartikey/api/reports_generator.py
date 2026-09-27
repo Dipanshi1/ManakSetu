@@ -128,7 +128,7 @@ def generate_pdf_report(analysis_data: dict) -> bytes:
                 Paragraph(s.get('title', ''), normal_style),
                 Paragraph('Not stated' if raw_status in ('', 'unknown') else raw_status.upper(), normal_style)
             ])
-        std_table = Table(std_data, colWidths=[100, 320, 80])
+        std_table = Table(std_data, colWidths=[120, 315, 80])
         std_table.setStyle(TableStyle([
             ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#ccfbf1')),
             ('TEXTCOLOR', (0,0), (-1,0), colors.HexColor('#115e59')),
