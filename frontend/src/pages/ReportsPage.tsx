@@ -31,6 +31,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Avatar } from '@/components/ui/Avatar';
 import { useRouter } from '@/router';
+import { useAuth } from '@/auth/AuthContext';
 import { reports, getAnalysisById, getStandardById, getSpecificationRequirementsByAnalysisId } from '@/data/mockData';
 import { listRealAnalyses, deleteRealAnalysis } from '@/data/runtimeStore';
 import { formatDate } from '@/utils/format';
@@ -76,6 +77,7 @@ type ReportState = 'demo' | 'failed' | 'stale' | 'ok';
 
 export function ReportsPage() {
   const { navigate } = useRouter();
+  const { user } = useAuth();
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState<ReportType | 'all'>('all');
   const [previewReport, setPreviewReport] = useState<Report | null>(null);
@@ -110,13 +112,35 @@ export function ReportsPage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   const handleEmailReport = async (reportId: string, analysisId: string) => {
+    if (!user?.email) {
+      alert('Please sign in with a valid email address to send reports.');
+      return;
+    }
     setIsEmailing(reportId);
     try {
-      const res = await fetch(`${API_ROOT}/analyses/${analysisId}/report/email`, { method: 'POST', headers: { 'X-API-Key': API_KEY } });
-      if (!res.ok) throw new Error('Failed to send email via n8n');
-      alert('Report successfully dispatched for email delivery via n8n!');
-    } catch (err) {
-      alert('Failed to send email. Check backend logs.');
+      const res = await fetch(`${API_ROOT}/analyses/${encodeURIComponent(analysisId)}/report/email`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-API-Key': API_KEY,
+        },
+        body: JSON.stringify({ recipient_email: user.email }),
+      });
+      if (!res.ok) {
+        let message = `Failed to send email (${res.status}).`;
+        try {
+          const body = await res.json();
+          message = body?.detail?.message || body?.detail?.error || body?.message || message;
+        } catch {
+          // non-JSON error body; keep the generic message
+        }
+        throw new Error(message);
+      }
+      const data = await res.json().catch(() => null);
+      alert(data?.message || 'Report successfully dispatched for email delivery!');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to send email.';
+      alert(message);
     } finally {
       setIsEmailing(null);
     }
@@ -359,7 +383,7 @@ export function ReportsPage() {
                         <div className="mt-4 grid grid-cols-3 gap-2">
                           <Button variant="secondary" size="sm" leftIcon={<Eye size={13} />} onClick={() => setPreviewReport(report)}>View</Button>
                           <Button variant="secondary" size="sm" disabled={isDownloading === report.id || state === 'failed'} title={state === 'stale' ? 'Not on server — prints the cached preview' : undefined} leftIcon={<Download size={13} />} onClick={(e) => { e.stopPropagation(); handleDownloadPdf(report); }}>{isDownloading === report.id ? '...' : state === 'stale' ? 'Print' : 'PDF'}</Button>
-                          <Button variant="secondary" size="sm" disabled={isEmailing === report.id || state === 'failed' || state === 'stale'} title={state === 'stale' ? 'Not on server — email needs the server analysis' : undefined} leftIcon={<Send size={13} />} onClick={(e) => { e.stopPropagation(); handleEmailReport(report.id, report.analysisId); }}>{isEmailing === report.id ? '...' : 'Email'}</Button>
+                          <Button variant="secondary" size="sm" disabled={isEmailing === report.id || state === 'failed' || state === 'stale' || !user?.email} title={!user?.email ? 'Sign in with an email address to send reports' : state === 'stale' ? 'Not on server — email needs the server analysis' : undefined} leftIcon={<Send size={13} />} onClick={(e) => { e.stopPropagation(); handleEmailReport(report.id, report.analysisId); }}>{isEmailing === report.id ? '...' : 'Email'}</Button>
                         </div>
                       </Card>
                     </motion.div>
@@ -477,8 +501,10 @@ export function ReportsPage() {
 }
 
 function ReportPreviewModal({ report, onClose, isEmailing, handleEmailReport, isDownloading, handleDownloadPdf, state }: { report: Report; onClose: () => void; isEmailing: string | null; handleEmailReport: (rId: string, aId: string) => void; isDownloading: string | null; handleDownloadPdf: (report: Report) => void; state: ReportState }) {
+  const { user } = useAuth();
   const emailBlockedReason =
-    state === 'demo' ? 'Demo report — email needs a real analysis on the server'
+    !user?.email ? 'Sign in with an email address to send reports'
+    : state === 'demo' ? 'Demo report — email needs a real analysis on the server'
     : state === 'stale' ? 'Not on server — email needs the server analysis'
     : state === 'failed' ? 'The analysis failed; there is no report to send'
     : undefined;

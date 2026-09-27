@@ -84,8 +84,31 @@ async def get_report(analysis_id: str) -> dict:
         ).model_dump(mode="json"),
     }
 
+from typing import Annotated
 from fastapi import Response
+from pydantic import BaseModel, StringConstraints
+
+try:
+    from pydantic import EmailStr
+    class _EmailProbe(BaseModel):
+        probe: EmailStr
+except ImportError:
+    # Graceful fallback when optional email-validator package is not installed
+    EmailStr = Annotated[
+        str,
+        StringConstraints(
+            pattern=r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$",
+            strip_whitespace=True,
+        ),
+    ]
+
+import httpx
+
 from kartikey.api.reports_generator import generate_pdf_report
+from shared.config import settings
+
+class EmailReportRequest(BaseModel):
+    recipient_email: EmailStr
 
 @router.get("/{analysis_id}/report/pdf")
 async def get_pdf_report(analysis_id: str):
@@ -105,56 +128,70 @@ async def get_pdf_report(analysis_id: str):
         }
     )
 
-import os
-import httpx
-
 @router.post("/{analysis_id}/report/email")
-async def email_pdf_report(analysis_id: str):
+async def email_pdf_report(analysis_id: str, request: EmailReportRequest):
     """
-    Generate the PDF report and email it via the n8n webhook.
+    Generate the PDF report and email it via the configured webhook.
     """
+    # 1. Pre-flight check: ensure webhook transport is configured before generating PDF
+    webhook_url = settings.n8n_report_webhook_url.strip()
+    if not webhook_url:
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "error": "EMAIL_SERVICE_NOT_CONFIGURED",
+                "message": "Email delivery service is not configured on this server.",
+            },
+        )
+
+    # 2. Retrieve analysis data
     json_report = await get_report(analysis_id)
     analysis_data = json_report["analysis"]
     
-    # 1. Generate PDF bytes
+    # 3. Generate PDF bytes
     pdf_bytes = generate_pdf_report(analysis_data)
     
-    # 2. Extract metadata
+    # 4. Extract metadata
     tender_title = analysis_data.get("tender_title", "Untitled Analysis")
     tender_id = analysis_data.get("tender_id") or analysis_id
     status = analysis_data.get("status", "completed")
-
-    # No computed completeness score is available at this point without
-    # re-running the procurement scoring logic (which lives in the BFF route
-    # and needs the full Analysis object). The n8n template receives the
-    # real issues_found count instead — the only genuinely derived metric
-    # available here. Do not invent a percentage.
     issues_found = analysis_data.get("issues_found", 0) or 0
         
-    # 3. Post to n8n webhook
-    webhook_url = os.getenv("N8N_REPORT_WEBHOOK_URL", "https://kakakkakakak.app.n8n.cloud/webhook/send-report")
-    
-    import httpx
-    
+    # 5. Dispatch to webhook
     try:
         async with httpx.AsyncClient() as client:
             files = {
                 "report_pdf": ("StandIQ-Report.pdf", pdf_bytes, "application/pdf")
             }
             data = {
-                "tender_title": tender_title,
-                "tender_id": tender_id,
+                "tender_title": str(tender_title),
+                "tender_id": str(tender_id),
                 "issues_found": str(issues_found),
-                "status": status,
+                "status": str(status),
+                "recipient_email": str(request.recipient_email),
             }
             
             response = await client.post(webhook_url, data=data, files=files, timeout=15.0)
             
             if response.status_code >= 400:
-                logger.error(f"Failed to trigger n8n webhook: {response.text}")
-                raise HTTPException(status_code=502, detail="Failed to deliver email via n8n.")
+                logger.error(f"Failed to trigger email webhook: status={response.status_code}")
+                raise HTTPException(
+                    status_code=502,
+                    detail={
+                        "error": "EMAIL_DELIVERY_FAILED",
+                        "message": f"Email delivery provider responded with error (status {response.status_code}).",
+                    },
+                )
                 
-            return {"success": True, "message": "Report successfully dispatched to n8n for email delivery."}
+            return {"success": True, "message": "Report successfully dispatched for email delivery."}
+    except HTTPException:
+        raise
     except httpx.RequestError as e:
-        logger.error(f"Error contacting n8n webhook: {str(e)}")
-        raise HTTPException(status_code=502, detail="Failed to contact the email delivery service.")
+        logger.error(f"Error contacting email webhook: {type(e).__name__}")
+        raise HTTPException(
+            status_code=502,
+            detail={
+                "error": "EMAIL_SERVICE_UNREACHABLE",
+                "message": "Failed to contact the email delivery service.",
+            },
+        )

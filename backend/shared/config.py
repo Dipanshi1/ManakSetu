@@ -105,6 +105,11 @@ class Settings(BaseSettings):
     bhashini_api_key: str = Field(default="")
     bhashini_user_id: str = Field(default="")
 
+    # ------------------------------------------------------------------
+    # Reports & Webhooks
+    # ------------------------------------------------------------------
+    n8n_report_webhook_url: str = Field(default="")
+
     @property
     def is_development(self) -> bool:
         return self.app_env == "development"
