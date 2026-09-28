@@ -27,13 +27,11 @@ import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { useRouter } from '@/router';
-import { createAnalysis, waitForAnalysis, getSampleDocument, extractProfilePreview, getBackendHealth } from '@/services/api';
+import { createAnalysis, waitForAnalysis, extractProfilePreview, getBackendHealth } from '@/services/api';
 import { statusBadge } from '@/services/adapter';
 import type { ProcurementProfile, ProfileParameter, ProfileFieldStatus } from '@/data/types';
 
 // Realistic sample data for LED Street Lighting tender
-const SAMPLE_TENDER_FILENAME = 'NIT_MCD_2024_LED_StreetLighting_Specs.pdf';
-
 const SAMPLE_PASTED_SPEC = `TECHNICAL SPECIFICATION FOR 90W–120W LED STREET LIGHTING LUMINAIRES
 1. SCOPE & APPLICATION:
 Supply and installation of energy-efficient outdoor LED luminaires for urban arterial roads and public highways under Municipal Infrastructure Modernization Project.
@@ -57,8 +55,6 @@ Supply and installation of energy-efficient outdoor LED luminaires for urban art
 - Photometric and lumen maintenance test report (L70 > 50,000 burning hours).
 - Mandatory BIS Compulsory Registration Scheme (CRS) certification for LED driver and module under MeitY orders.
 - Design compliance with National Lighting Code SP 72:2010.`;
-
-const SAMPLE_DESCRIBED_TEXT = `We are floating a municipal tender for 90W to 120W commercial LED street lighting luminaires to be deployed on urban arterial roads and highways. Luminaires must have high efficacy (minimum 135 lm/W), IP66 outdoor weatherproofing, CCT between 4000K and 5000K, THD below 10%, and ≥ 10 kV driver surge immunity with thermal auto-cutoff. Bidders must submit NABL test reports for IP66 and proof of BIS CRS compulsory registration.`;
 
 const HINDI_PROFILE: ProcurementProfile = {
   "product": "Air Conditioning Units (Split/Tower/Cassette)",
@@ -443,27 +439,6 @@ export function NewAnalysisPage() {
     setDemoFixture(null);
   };
 
-  // Load sample data helper — fetches the real bundled tender PDF for upload mode
-  const handleLoadSample = async () => {
-    setAnalysisTitle('Municipal LED Street Lighting — Arterial Roads NIT #MCD-2024-LT-09');
-    setDemoFixture('led');
-    if (inputMode === 'upload') {
-      try {
-        const file = await getSampleDocument();
-        setUploadedFileObjects([file]);
-        setUploadedFiles([{ name: file.name, size: formatSize(file.size), pages: 18 }]);
-      } catch {
-        // Sample endpoint unavailable (backend cold/offline) — keep metadata; submit falls back to sample text
-        setUploadedFileObjects([]);
-        setUploadedFiles([{ name: SAMPLE_TENDER_FILENAME, size: '2.8 MB', pages: 18 }]);
-      }
-    } else if (inputMode === 'paste') {
-      setPastedSpec(SAMPLE_PASTED_SPEC);
-    } else {
-      setDescribedText(SAMPLE_DESCRIBED_TEXT);
-    }
-  };
-
   // Confirm & run the real analysis on the live backend, then open the real result
   const handleConfirmAndAnalyze = async () => {
     setIsSubmitting(true);
@@ -839,13 +814,6 @@ export function NewAnalysisPage() {
                       >
                         Browse Files
                       </button>
-                      <button
-                        type="button"
-                        onClick={handleLoadSample}
-                        className="btn-ghost text-xs text-teal-700 hover:bg-teal-50 py-1.5 px-3 font-medium"
-                      >
-                        Load LED Street-Lighting Example
-                      </button>
                     </div>
                   </div>
 
@@ -890,13 +858,6 @@ export function NewAnalysisPage() {
                     <label className="text-xs font-semibold text-ink-700 uppercase tracking-wider">
                       Technical Specification Text
                     </label>
-                    <button
-                      type="button"
-                      onClick={handleLoadSample}
-                      className="text-xs text-teal-700 hover:text-teal-900 font-medium"
-                    >
-                      Load LED street-lighting sample text
-                    </button>
                   </div>
                   <textarea
                     rows={10}
@@ -918,13 +879,6 @@ export function NewAnalysisPage() {
                     <label className="text-xs font-semibold text-ink-700 uppercase tracking-wider">
                       Natural Language Procurement Description
                     </label>
-                    <button
-                      type="button"
-                      onClick={handleLoadSample}
-                      className="text-xs text-teal-700 hover:text-teal-900 font-medium"
-                    >
-                      Load LED street-lighting description
-                    </button>
                   </div>
                   <textarea
                     rows={6}
@@ -951,7 +905,7 @@ export function NewAnalysisPage() {
                     Input ready for profile extraction
                   </span>
                 ) : (
-                  <span>Attach a file, paste specification text, or load the LED sample to proceed</span>
+                  <span>Attach a file, paste specification text, or describe a requirement to proceed</span>
                 )}
               </div>
 

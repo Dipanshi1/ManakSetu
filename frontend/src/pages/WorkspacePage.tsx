@@ -34,6 +34,10 @@ import { adaptAnalysisSummary } from '@/services/adapter';
 import { listAnalyses } from '@/services/api';
 import type { Analysis } from '@/data/types';
 
+// The seeded showcase analyses and activity feed in mockData are kept for
+// internal testing, but the normal Workspace shows only real analyses.
+const SHOW_DEMO_FIXTURES = false;
+
 export function WorkspacePage() {
   const { navigate } = useRouter();
 
@@ -83,7 +87,9 @@ export function WorkspacePage() {
   };
 
   // Real analyses from the live backend, merged ahead of the seeded demo showcases.
-  const [realRows, setRealRows] = useState<Analysis[]>([]);
+  // Cached analyses are already adapted Analysis objects; show them straight away
+  // (and if the backend is unreachable) rather than waiting for the list call.
+  const [realRows, setRealRows] = useState<Analysis[]>(() => listRealAnalyses());
   useEffect(() => {
     let alive = true;
     listAnalyses()
@@ -92,7 +98,7 @@ export function WorkspacePage() {
         const backendAdapted = backendList.map(adaptAnalysisSummary);
         
         // Merge with locally stored analyses (localStorage resilience against Render DB wipes)
-        const localList = listRealAnalyses().map(adaptAnalysisSummary);
+        const localList = listRealAnalyses();
         
         // Deduplicate by ID, preferring backend data if available
         const backendMap = new Map(backendAdapted.map(a => [a.id, a]));
@@ -112,16 +118,25 @@ export function WorkspacePage() {
   }, []);
 
   // Merge real rows first; only show demos that haven't been hidden
-  const visibleDemos = analyses.filter((m) => !realRows.some((r) => r.id === m.id) && !hiddenDemoIds.has(m.id));
+  const visibleDemos = SHOW_DEMO_FIXTURES
+    ? analyses.filter((m) => !realRows.some((r) => r.id === m.id) && !hiddenDemoIds.has(m.id))
+    : [];
   const analysesList = [...realRows, ...visibleDemos];
 
   const completedAnalyses = analysesList.filter((a) => a.status === 'completed');
   const processingAnalyses = analysesList.filter((a) => a.status === 'processing');
   const draftAnalyses = analysesList.filter((a) => a.status === 'draft');
 
-  const totalStandards = completedAnalyses.reduce((sum, a) => sum + a.standardsIdentified, 0);
-  const totalGaps = completedAnalyses.reduce((sum, a) => sum + a.gapsFound, 0);
-  const totalCerts = completedAnalyses.reduce((sum, a) => sum + a.certificationsRequired, 0);
+  // Backend list summaries carry no standard or certification counts; the
+  // analyses cached in this browser do, so prefer those where available.
+  const cachedAnalyses = listRealAnalyses();
+  const cachedById = new Map(cachedAnalyses.map((a) => [a.id, a]));
+  const countsFor = (a: Analysis) => cachedById.get(a.id) ?? a;
+  const totalStandards = completedAnalyses.reduce((sum, a) => sum + countsFor(a).standardsIdentified, 0);
+  const totalGaps = completedAnalyses.reduce((sum, a) => sum + countsFor(a).gapsFound, 0);
+  const totalCerts = completedAnalyses.reduce((sum, a) => sum + countsFor(a).certificationsRequired, 0);
+  // The Reports page lists one report per analysis cached in this browser.
+  const totalReports = cachedAnalyses.length;
 
   return (
     <div className="min-h-screen bg-ivory-50 text-ink-900 dark:bg-[#090D16] dark:text-slate-100">
@@ -133,7 +148,7 @@ export function WorkspacePage() {
           <div>
             <h1 className="text-2xl font-bold tracking-tight text-ink-900 dark:text-white">Workspace</h1>
             <p className="mt-1 text-sm text-ink-500 dark:text-slate-400">
-              {analysesList.length} analyses · {workspaceMembers.length} team members · Defensible Procurement Intelligence
+              {analysesList.length} {analysesList.length === 1 ? 'analysis' : 'analyses'} · {SHOW_DEMO_FIXTURES && `${workspaceMembers.length} team members · `}Defensible Procurement Intelligence
             </p>
           </div>
           <Button onClick={() => navigate({ name: 'new-analysis' })} leftIcon={<Plus size={16} />}>
@@ -147,7 +162,7 @@ export function WorkspacePage() {
             { label: 'Standards Identified', value: totalStandards, icon: <FileStack size={18} />, accent: 'text-teal-700 bg-teal-50 dark:bg-teal-950/70 dark:text-teal-300' },
             { label: 'Gaps Found', value: totalGaps, icon: <TrendingUp size={18} />, accent: 'text-warning-700 bg-warning-50 dark:bg-amber-950/70 dark:text-amber-300' },
             { label: 'Certifications Required', value: totalCerts, icon: <ShieldCheck size={18} />, accent: 'text-blue-700 bg-blue-50 dark:bg-blue-950/70 dark:text-blue-300' },
-            { label: 'Reports Generated', value: 4, icon: <FileText size={18} />, accent: 'text-ink-600 bg-ivory-100 dark:bg-slate-800 dark:text-slate-300' },
+            { label: 'Reports Generated', value: totalReports, icon: <FileText size={18} />, accent: 'text-ink-600 bg-ivory-100 dark:bg-slate-800 dark:text-slate-300' },
           ].map((stat, i) => (
             <motion.div
               key={i}
@@ -200,6 +215,16 @@ export function WorkspacePage() {
               </div>
 
               <div className="divide-y divide-ink-100">
+                {analysesList.length === 0 && (
+                  <div className="px-5 py-10 text-center">
+                    <FileText size={22} className="mx-auto mb-2 text-ink-300" />
+                    <p className="text-sm font-medium text-ink-700">No analyses yet</p>
+                    <p className="mt-1 text-xs text-ink-400">Start a new analysis to see its results here.</p>
+                    <Button size="sm" className="mt-4" onClick={() => navigate({ name: 'new-analysis' })} leftIcon={<Plus size={14} />}>
+                      New Analysis
+                    </Button>
+                  </div>
+                )}
                 {analysesList.map((analysis) => {
                   const status = analysisStatusConfig[analysis.status];
                   // Demo IDs are the hardcoded mock IDs (an-001, an-002, an-003, an-hindi, an-tamil)
@@ -274,7 +299,8 @@ export function WorkspacePage() {
 
           {/* Right column */}
           <div className="space-y-6">
-            {/* Team */}
+            {/* Team (mock members; demo only) */}
+            {SHOW_DEMO_FIXTURES && (
             <Card padding="none">
               <div className="flex items-center justify-between border-b border-ink-100 px-5 py-4">
                 <h2 className="text-sm font-semibold text-ink-900">Team</h2>
@@ -293,6 +319,7 @@ export function WorkspacePage() {
                 ))}
               </div>
             </Card>
+            )}
 
             {/* Activity */}
             <Card padding="none">
@@ -301,7 +328,10 @@ export function WorkspacePage() {
                 <ActivityIcon size={15} className="text-ink-400" />
               </div>
               <div className="divide-y divide-ink-100">
-                {recentActivity.map((activity) => {
+                {!SHOW_DEMO_FIXTURES && (
+                  <p className="px-5 py-6 text-center text-xs text-ink-400">No recent activity yet.</p>
+                )}
+                {SHOW_DEMO_FIXTURES && recentActivity.map((activity) => {
                   const member = getMemberById(activity.memberId);
                   return (
                     <div key={activity.id} className="px-5 py-3">
