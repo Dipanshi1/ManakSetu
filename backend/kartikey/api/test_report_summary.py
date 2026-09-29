@@ -17,10 +17,17 @@ from kartikey.api import report_summary
 from kartikey.api.report_summary import (
     SUMMARY_FALLBACK,
     build_summary_facts,
+    build_summary_prompt,
     generate_executive_summary,
     validate_summary,
 )
 from shared.utils import AnalysisError
+
+
+_LUMINAIRES = {"id": "s-10322", "designation": "IS 10322 : Part 5 : Sec 3:2012", "title": "Luminaires", "status": "active"}
+_IP_CODES = {"id": "s-60529", "designation": "IS/IEC 60529:2001", "title": "Degrees of protection", "status": "active"}
+_CITED_ONLY = {"id": "s-16107", "designation": "IS 16107 : Part 1:2012", "title": "Luminaire performance", "status": "active"}
+_SUCCESSOR_ONLY = {"id": "s-302", "designation": "IS 302 : Part 2 : Sec 40:2025", "title": "Appliance safety", "status": "active"}
 
 
 def _analysis_data() -> dict:
@@ -33,14 +40,16 @@ def _analysis_data() -> dict:
         ],
         "findings": [
             {"requirement_id": "r1", "verdict": "justified", "reason": "Matches IS 10322.",
-             "requires_human_verification": False},
+             "requires_human_verification": False,
+             "applicable_standards": [_LUMINAIRES],
+             "cited_standards": []},
             {"requirement_id": "r2", "verdict": "ambiguous", "reason": "IP rating stated without test method.",
-             "requires_human_verification": True},
+             "requires_human_verification": True,
+             "applicable_standards": [_IP_CODES, _LUMINAIRES],
+             "cited_standards": [_CITED_ONLY]},
         ],
-        "standards": [
-            {"designation": "IS 10322 : Part 5 : Sec 3:2012", "title": "Luminaires", "status": "active"},
-            {"designation": "IS/IEC 60529:2001", "title": "Degrees of protection", "status": "active"},
-        ],
+        # The API's broader list, including an entry no finding treats as applicable.
+        "standards": [_LUMINAIRES, _IP_CODES, _SUCCESSOR_ONLY],
         "qco_findings": [
             {"is_number": "IS 10322", "notification_title": "LED Luminaires QCO",
              "certification_scheme": "Scheme-I", "is_mandatory": True},
@@ -56,9 +65,11 @@ def test_facts_carry_only_existing_results():
     facts = build_summary_facts(_analysis_data())
     assert facts["requirements_analysed"] == 2
     assert facts["verdict_counts"] == {"justified": 1, "ambiguous": 1}
-    assert [s["designation"] for s in facts["standards"]] == [
+    assert [s["designation"] for s in facts["applicable_standards"]] == [
         "IS 10322 : Part 5 : Sec 3:2012", "IS/IEC 60529:2001",
     ]
+    assert facts["applicable_standards_count"] == 2
+    assert "standards" not in facts
     # Only non-justified findings are issues.
     assert [i["verdict"] for i in facts["issues"]] == ["ambiguous"]
     assert facts["human_review_items"] == 1
@@ -82,7 +93,7 @@ def test_valid_summary_is_accepted():
 
 def test_summary_naming_a_standard_outside_the_analysis_is_rejected():
     facts = build_summary_facts(_analysis_data())
-    bad = GOOD + " Compliance with IS 16107 is also required."
+    bad = GOOD + " Compliance with IS 15885 is also required."
     assert validate_summary({"summary": bad}, facts) is None
 
 
@@ -104,6 +115,65 @@ def test_ordinary_lowercase_is_is_not_mistaken_for_a_standard():
 def test_malformed_output_is_rejected(result):
     facts = build_summary_facts(_analysis_data())
     assert validate_summary(result, facts) is None
+
+
+# ---------------------------------------------------------------------------
+# Applicable standards are labelled explicitly
+# ---------------------------------------------------------------------------
+
+def test_applicable_standards_come_only_from_findings_applicable_lists():
+    facts = build_summary_facts(_analysis_data())
+    designations = [s["designation"] for s in facts["applicable_standards"]]
+    # First-seen order, de-duplicated (IS 10322 appears on both findings).
+    assert designations == ["IS 10322 : Part 5 : Sec 3:2012", "IS/IEC 60529:2001"]
+
+
+def test_cited_only_standard_is_not_presented_as_applicable():
+    facts = build_summary_facts(_analysis_data())
+    applicable = {s["designation"] for s in facts["applicable_standards"]}
+    assert "IS 16107 : Part 1:2012" not in applicable
+    assert [s["designation"] for s in facts["cited_not_applicable_standards"]] == ["IS 16107 : Part 1:2012"]
+
+
+def test_standard_only_in_the_broader_list_is_not_applicable():
+    facts = build_summary_facts(_analysis_data())
+    everything = [s["designation"] for s in facts["applicable_standards"] + facts["cited_not_applicable_standards"]]
+    assert "IS 302 : Part 2 : Sec 40:2025" not in everything
+
+
+def test_standard_both_applicable_and_cited_is_listed_once_as_applicable():
+    data = _analysis_data()
+    data["findings"][0]["cited_standards"] = [_IP_CODES]
+    facts = build_summary_facts(data)
+    assert "IS/IEC 60529:2001" in [s["designation"] for s in facts["applicable_standards"]]
+    assert "IS/IEC 60529:2001" not in [s["designation"] for s in facts["cited_not_applicable_standards"]]
+
+
+def test_empty_applicable_standards():
+    data = _analysis_data()
+    for f in data["findings"]:
+        f["applicable_standards"] = []
+    facts = build_summary_facts(data)
+    assert facts["applicable_standards"] == []
+    assert facts["applicable_standards_count"] == 0
+    prompt = build_summary_prompt(facts)
+    assert "If applicable_standards is empty, say that no applicable standards were identified" in prompt
+
+
+def test_prompt_uses_applicable_field_and_short_paragraphs_not_line_breaks():
+    prompt = build_summary_prompt(build_summary_facts(_analysis_data()))
+    assert "as five short paragraphs" in prompt
+    assert "line break" not in prompt.lower()
+    assert "one per line" not in prompt.lower()
+    assert "applicable_standards field only" in prompt
+    assert "do not name a primary standard" in prompt
+    assert '"applicable_standards"' in prompt  # the labelled field is in the facts sent
+
+
+def test_guard_accepts_cited_standard_mentioned_as_an_issue():
+    facts = build_summary_facts(_analysis_data())
+    text = GOOD + " The tender also cites IS 16107, which the analysis found not applicable."
+    assert validate_summary({"summary": text}, facts) == text
 
 
 # ---------------------------------------------------------------------------

@@ -45,11 +45,15 @@ _STANDARD_REF_RE = re.compile(r"\b(?:IS|IEC|ISO)(?:\s*/\s*(?:IEC|ISO))*\s*[:\-]?
 
 _SYSTEM_PROMPT = (
     "You write the executive summary of an Indian public-procurement standards "
-    "report. Use ONLY the facts in the JSON you are given; they come from an "
-    "analysis that has already been completed. Do not add, infer, rank or "
-    "recommend standards, certifications, clauses, evidence or legal "
-    "conclusions. Refer to a standard only by a designation that appears in the "
-    "facts. If the facts are thin, say less. Plain sentences, no markdown."
+    "report for a procurement officer. Use ONLY the facts in the JSON you are "
+    "given; they come from an analysis that has already been completed. You do "
+    "not decide anything: do not add, infer, rank or recommend standards, "
+    "certifications, clauses, evidence or legal conclusions, and do not decide "
+    "which standard applies. Refer to a standard only by a designation that "
+    "appears in the facts, and never repeat the same standard. Do not call a "
+    "standard primary unless the facts say so, and do not call anything legally "
+    "mandatory unless the facts say so. Never write \"the AI recommends\" or "
+    "similar. If the facts are thin, say less. Plain text, no markdown."
 )
 
 
@@ -58,11 +62,32 @@ def _clip(text: Any, limit: int) -> str:
     return s if len(s) <= limit else s[: limit - 1] + "…"
 
 
+def _standards_from_findings(findings: list[dict], group: str, exclude: set[str] = frozenset()) -> list[dict]:
+    """
+    The standards the completed analysis placed in `group` ("applicable_standards"
+    or "cited_standards") on its findings, de-duplicated in first-seen order.
+    Taken as the analysis recorded them: no ranking, and no applicability decided here.
+    """
+    out: list[dict] = []
+    seen: set[str] = set(exclude)
+    for f in findings:
+        for s in f.get(group) or []:
+            key = s.get("id") or s.get("designation") or s.get("is_number")
+            if not key or key in seen:
+                continue
+            seen.add(key)
+            out.append({
+                "designation": s.get("designation") or s.get("is_number"),
+                "title": _clip(s.get("title"), 160),
+                "status": s.get("status"),
+            })
+    return out
+
+
 def build_summary_facts(analysis_data: dict) -> dict:
     """The structured results the summary may draw on, and nothing else."""
     requirements = analysis_data.get("requirements") or []
     findings = analysis_data.get("findings") or []
-    standards = analysis_data.get("standards") or []
     req_text = {r.get("id"): r.get("text") for r in requirements}
 
     profile = analysis_data.get("product_profile") or {}
@@ -93,19 +118,25 @@ def build_summary_facts(analysis_data: dict) -> dict:
         if isinstance(q, dict)
     ][:_MAX_CERTIFICATIONS]
 
+    applicable = _standards_from_findings(findings, "applicable_standards")
+    applicable_keys = {
+        s.get("id") or s.get("designation") or s.get("is_number")
+        for f in findings for s in (f.get("applicable_standards") or [])
+    }
+    cited = _standards_from_findings(findings, "cited_standards", exclude=applicable_keys)
+
     return {
         "tender_title": analysis_data.get("tender_title"),
         "procurement_context": context,
         "requirements_analysed": len(requirements),
         "verdict_counts": dict(Counter(f.get("verdict") for f in findings if f.get("verdict"))),
-        "standards": [
-            {
-                "designation": s.get("designation") or s.get("is_number"),
-                "title": _clip(s.get("title"), 160),
-                "status": s.get("status"),
-            }
-            for s in standards
-        ][:_MAX_STANDARDS],
+        # Only the standards the analysis itself attached to findings as
+        # applicable. A standard the tender cites but the analysis found not to
+        # apply is kept apart, so it can be discussed as an issue without being
+        # presented as applicable.
+        "applicable_standards_count": len(applicable),
+        "applicable_standards": applicable[:_MAX_STANDARDS],
+        "cited_not_applicable_standards": cited[:_MAX_STANDARDS],
         "issues": issues,
         "certification_orders": certifications,
         "human_review_items": sum(1 for f in findings if f.get("requires_human_verification")),
@@ -114,11 +145,33 @@ def build_summary_facts(analysis_data: dict) -> dict:
 
 def build_summary_prompt(facts: dict) -> str:
     return (
-        "Write a 4-6 sentence executive summary (under 130 words) of this "
-        "procurement analysis for a procurement officer: what was analysed, "
-        "which standards were matched, the main issues, certification "
-        "obligations, and how many items need human review.\n"
-        'Reply with JSON only: {"summary": "..."}\n\n'
+        "Write a concise, decision-oriented executive summary of this "
+        "procurement analysis, organised around the procurement decision. Use "
+        "these five parts, in order, as five short paragraphs:\n"
+        "1. Procurement conclusion: 1-2 sentences on what the analysis "
+        "concluded overall.\n"
+        "2. Applicable standards: summarize the standards in the "
+        "applicable_standards field only (applicable_standards_count is their "
+        "total). Do not rank, prioritize, or choose among them, and do not name a "
+        "primary standard. State the total and mention a compact representative "
+        "set without implying priority; do not list related, normative or testing "
+        "standards. Standards in cited_not_applicable_standards are not applicable "
+        "and may be mentioned only as an issue. If applicable_standards is empty, "
+        "say that no applicable standards were identified in this analysis.\n"
+        "3. Key issues: the most important gaps, incorrect or outdated "
+        "references, ambiguities and human-review items, summarised rather than "
+        "repeated verbatim.\n"
+        "4. Certification / regulatory status: only what the facts state about "
+        "certification or QCO orders. If there are none, write exactly: \"No "
+        "certification obligations were identified in this analysis.\"\n"
+        "5. Procurement action: the practical next step that follows from the "
+        "findings, such as confirming the applicable standards, correcting an "
+        "outdated or incorrect reference, resolving flagged gaps, or completing "
+        "human verification.\n"
+        "Prioritise clarity over completeness: this is an executive summary, not "
+        "a standards catalogue. Keep the whole summary to about 120-170 words and "
+        "never more than 1,100 characters.\n"
+        'Reply with valid JSON only: {"summary": "..."}\n\n'
         f"FACTS:\n{json.dumps(facts, ensure_ascii=False)}"
     )
 
@@ -145,7 +198,7 @@ def validate_summary(result: Any, facts: dict) -> str | None:
         return None
 
     allowed: set[str] = set()
-    for s in facts.get("standards") or []:
+    for s in (facts.get("applicable_standards") or []) + (facts.get("cited_not_applicable_standards") or []):
         allowed |= _referenced_numbers(str(s.get("designation") or ""))
     introduced = _referenced_numbers(summary) - allowed
     if introduced:
@@ -164,7 +217,7 @@ async def generate_executive_summary(analysis_data: dict) -> str | None:
     Returns the validated summary, or None on any failure. Never raises.
     """
     facts = build_summary_facts(analysis_data)
-    if not facts["requirements_analysed"] and not facts["standards"]:
+    if not facts["requirements_analysed"] and not facts["applicable_standards"]:
         return None
     try:
         from kartikey.analysis.llm_client import get_llm_client
