@@ -381,7 +381,9 @@ export function ReportsPage() {
                           </div>
                           <div className="flex items-center gap-2">
                             <Badge variant="neutral">{report.format}</Badge>
-                            <span className="text-xs text-ink-400 dark:text-slate-500">{report.pages}p</span>
+                            {report.pages > 0 && (
+                              <span className="text-xs text-ink-400 dark:text-slate-500">{report.pages}p</span>
+                            )}
                           </div>
                         </div>
                         <div className="mt-4 grid grid-cols-3 gap-2">
@@ -465,7 +467,9 @@ export function ReportsPage() {
                           </div>
                           <div className="flex items-center gap-2">
                             <Badge variant="neutral">{report.format}</Badge>
-                            <span className="text-xs text-ink-400 dark:text-slate-500">{report.pages}p</span>
+                            {report.pages > 0 && (
+                              <span className="text-xs text-ink-400 dark:text-slate-500">{report.pages}p</span>
+                            )}
                           </div>
                         </div>
                         <div className="mt-4 grid grid-cols-3 gap-2">
