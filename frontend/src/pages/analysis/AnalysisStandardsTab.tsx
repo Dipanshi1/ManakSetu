@@ -62,6 +62,8 @@ export function AnalysisStandardsTab({ analysis, isReal = false, onSyncComplete 
     last_synced_at: string | null;
     total_synced: number;
     error_count: number;
+    in_progress?: boolean;
+    planned?: number | null;
   } | null>(null);
 
   useEffect(() => {
@@ -75,6 +77,7 @@ export function AnalysisStandardsTab({ analysis, isReal = false, onSyncComplete 
       return () => { cancelled = true; };
     }
 
+    let timer: ReturnType<typeof setTimeout> | undefined;
     const fetchStatus = () => {
       // Scope to this analysis so other tabs don't bleed through
       fetch(`${API_ROOT}/standards/bis-sync-status?analysis_id=${analysis.id}`, { headers: { 'X-API-Key': API_KEY } })
@@ -83,17 +86,21 @@ export function AnalysisStandardsTab({ analysis, isReal = false, onSyncComplete 
           return r.json();
         })
         .then((data) => {
-          if (!cancelled) setBisSync(data);
+          if (cancelled) return;
+          setBisSync(data);
+          // Poll every 5s while the background sync is still running, so progress
+          // shows as it happens; otherwise every 30s, as before.
+          timer = setTimeout(fetchStatus, data?.in_progress ? 5_000 : 30_000);
         })
         .catch(() => {
-          if (!cancelled) setBisSync({ last_synced_at: null, total_synced: 0, error_count: 0 });
+          if (cancelled) return;
+          setBisSync({ last_synced_at: null, total_synced: 0, error_count: 0 });
+          timer = setTimeout(fetchStatus, 30_000);
         });
     };
 
     fetchStatus();
-    // Poll every 30s so the timestamp updates automatically after a background sync completes
-    const interval = setInterval(fetchStatus, 30_000);
-    return () => { cancelled = true; clearInterval(interval); };
+    return () => { cancelled = true; clearTimeout(timer); };
   }, [isReal, analysis.id]);
 
   const allMatchedRequirements = getMatchedRequirementsByAnalysisId(analysis.id);
@@ -579,7 +586,7 @@ export function AnalysisStandardsTab({ analysis, isReal = false, onSyncComplete 
           <div className="flex items-center gap-2.5">
             {/* Status dot */}
             <span className={`inline-block h-2 w-2 rounded-full shrink-0 ${
-              isSyncing ? 'bg-amber-400 animate-pulse' :
+              isSyncing || bisSync?.in_progress ? 'bg-amber-400 animate-pulse' :
               bisSync?.last_synced_at ? 'bg-emerald-500' :
               'bg-ink-300'
             }`} />
@@ -590,7 +597,12 @@ export function AnalysisStandardsTab({ analysis, isReal = false, onSyncComplete 
             {isSyncing && (
               <span className="text-xs text-amber-600 font-medium">Syncing with BIS portal…</span>
             )}
-            {!isSyncing && bisSync !== null && (
+            {!isSyncing && bisSync?.in_progress && (
+              <span className="text-xs text-amber-600 font-medium">
+                Checking with BIS portal… {bisSync.total_synced}{bisSync.planned ? ` of ${bisSync.planned}` : ''}
+              </span>
+            )}
+            {!isSyncing && bisSync !== null && !bisSync.in_progress && (
               <>
                 {bisSync.last_synced_at ? (
                   <span className="text-xs text-ink-400">

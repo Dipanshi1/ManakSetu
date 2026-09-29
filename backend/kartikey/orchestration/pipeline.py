@@ -694,7 +694,7 @@ async def _trigger_bis_sync(analysis: Analysis) -> None:
         from kshiraj.bis_live_ingestion.adapters.bis_client import BISClient, BISClientConfig
         from kshiraj.bis_live_ingestion.sync import BISSyncService
         from kartikey.orchestration.knowledge_registry import get_registry
-        from shared.sync_state import record_sync_result
+        from shared.sync_state import mark_sync_finished, mark_sync_started, record_sync_result
         from datetime import datetime, timezone
 
         registry = get_registry()
@@ -736,8 +736,15 @@ async def _trigger_bis_sync(analysis: Analysis) -> None:
                     else:
                         logger.info("BIS sync OK: %s changed=%s", is_number, result.changed)
 
-        # Run blocking sync calls in a thread pool so the event loop stays responsive
-        await asyncio.to_thread(_do_sync)
+        # Run blocking sync calls in a thread pool so the event loop stays responsive.
+        # The running marker lets the status endpoint report progress ("3 of 19")
+        # instead of presenting a partial count as final; it is cleared however
+        # the sync ends.
+        mark_sync_started(analysis.id, planned=len(is_numbers))
+        try:
+            await asyncio.to_thread(_do_sync)
+        finally:
+            mark_sync_finished(analysis.id)
 
     except Exception as exc:
         # Absolute last-resort catch — pipeline must never see this exception

@@ -7,6 +7,9 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib import colors
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
+from xml.sax.saxutils import escape
+
+from kartikey.api.report_summary import SUMMARY_FALLBACK
 
 _FONT_FAMILY_REGISTERED = False
 _BASE_FONT = 'Helvetica'
@@ -106,8 +109,10 @@ def generate_pdf_report(analysis_data: dict) -> bytes:
     # partially_completed analysis, which this route deliberately serves). None
     # reaches Paragraph and raises AttributeError, which surfaced as a 500 on
     # GET /report/pdf rather than as a report saying it has no summary.
-    summary_text = analysis_data.get('summary') or 'No summary was produced for this analysis.'
-    elements.append(Paragraph(summary_text, normal_style))
+    summary_text = analysis_data.get('summary') or SUMMARY_FALLBACK
+    # The summary is model-written plain text; escape it so a stray '&' or '<'
+    # is printed rather than read as Paragraph markup.
+    elements.append(Paragraph(escape(summary_text), normal_style))
     elements.append(Spacer(1, 20))
 
     # Applicable Standards

@@ -16,6 +16,22 @@ _lock = threading.Lock()
 # Outer key: analysis_id (str) or "_global" for pipeline auto-syncs without an analysis context
 # Inner key: IS number string
 _sync_registry: dict[str, dict[str, dict[str, Any]]] = {}
+# analysis_id -> number of standards a sync currently running for it will check.
+# Present only while that sync runs, so the UI can tell a partial count from a
+# finished one.
+_running: dict[str, int] = {}
+
+
+def mark_sync_started(analysis_id: str, planned: int) -> None:
+    """Record that a sync of `planned` standards has started for an analysis."""
+    with _lock:
+        _running[analysis_id] = planned
+
+
+def mark_sync_finished(analysis_id: str) -> None:
+    """Record that the sync for an analysis has ended (successfully or not)."""
+    with _lock:
+        _running.pop(analysis_id, None)
 
 
 def record_sync_result(
@@ -54,8 +70,11 @@ def get_sync_status(analysis_id: str | None = None) -> dict[str, Any]:
         total_synced    : int
         error_count     : int
         entries         : list[dict]
+        in_progress     : bool         (a sync for this analysis is still running)
+        planned         : int | None   (standards that running sync will check)
     """
     with _lock:
+        planned = _running.get(analysis_id) if analysis_id else None
         if analysis_id and analysis_id in _sync_registry:
             entries = list(_sync_registry[analysis_id].values())
         elif "_global" in _sync_registry:
@@ -74,4 +93,6 @@ def get_sync_status(analysis_id: str | None = None) -> dict[str, Any]:
         "total_synced": len(entries),
         "error_count": sum(1 for e in entries if e.get("errors")),
         "entries": entries,
+        "in_progress": planned is not None,
+        "planned": planned,
     }

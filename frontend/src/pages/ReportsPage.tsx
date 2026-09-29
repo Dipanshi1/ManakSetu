@@ -37,6 +37,10 @@ import { listRealAnalyses, deleteRealAnalysis } from '@/data/runtimeStore';
 import { formatDate } from '@/utils/format';
 import type { Report, ReportType } from '@/data/types';
 
+// The seeded showcase reports in mockData are kept for internal testing, but the
+// normal Reports page shows only reports for real analyses.
+const SHOW_DEMO_FIXTURES = false;
+
 const reportTypeConfig: Record<ReportType, { label: string; icon: typeof FileText; accent: string }> = {
   compliance: { label: 'Standards Intelligence Brief', icon: ShieldCheck, accent: 'text-teal-700 bg-teal-50 dark:bg-teal-950/60 dark:text-teal-300' },
   'gap-analysis': { label: 'Specification Quality Audit', icon: ListChecks, accent: 'text-amber-700 bg-amber-50 dark:bg-amber-950/60 dark:text-amber-300' },
@@ -207,7 +211,7 @@ export function ReportsPage() {
     }
   };
 
-  const allReports = [...realReps, ...reports];
+  const allReports = [...realReps, ...(SHOW_DEMO_FIXTURES ? reports : [])];
   const filtered = allReports.filter((r) => {
     if (search && !r.title.toLowerCase().includes(search.toLowerCase())) return false;
 
@@ -267,7 +271,7 @@ export function ReportsPage() {
                     : 'text-ink-500 hover:text-ink-700 dark:text-slate-400 dark:hover:text-slate-200'
                 }`}
               >
-                {f === 'all' ? 'All (3)' : reportTypeConfig[f].label.split(' ')[0]}
+                {f === 'all' ? `All (${allReports.length})` : reportTypeConfig[f].label.split(' ')[0]}
               </button>
             ))}
           </div>
@@ -478,7 +482,18 @@ export function ReportsPage() {
           )}
         </div>
 
-        {filtered.length === 0 && (
+        {allReports.length === 0 && (
+          <Card padding="lg" className="text-center">
+            <FileText size={24} className="mx-auto mb-2 text-ink-400" />
+            <p className="text-sm font-medium text-ink-900 dark:text-slate-100">No reports yet</p>
+            <p className="mt-1 text-sm text-ink-400 dark:text-slate-500">Reports appear here after you run an analysis.</p>
+            <Button onClick={() => navigate({ name: 'new-analysis' })} className="mt-4">
+              New Analysis
+            </Button>
+          </Card>
+        )}
+
+        {allReports.length > 0 && filtered.length === 0 && (
           <Card padding="lg" className="text-center">
             <Filter size={24} className="mx-auto mb-2 text-ink-400" />
             <p className="text-sm font-medium text-ink-900 dark:text-slate-100">No reports found</p>

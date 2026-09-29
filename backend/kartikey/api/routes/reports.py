@@ -104,8 +104,32 @@ except ImportError:
 
 import httpx
 
+from kartikey.api.report_summary import generate_executive_summary
 from kartikey.api.reports_generator import generate_pdf_report
 from shared.config import settings
+
+
+async def _ensure_executive_summary(analysis_id: str, analysis_data: dict) -> None:
+    """
+    Fill in analysis_data["summary"] for the PDF if the analysis has none yet.
+
+    The summary is written once, from the results already stored, and saved to
+    the analysis so later downloads reuse it. Any failure leaves the summary
+    empty and the PDF prints its fallback; this never raises.
+    """
+    if analysis_data.get("summary"):
+        return
+    summary = await generate_executive_summary(analysis_data)
+    if not summary:
+        return
+    analysis_data["summary"] = summary
+    try:
+        analysis = await repository.get(analysis_id)
+        if analysis and not analysis.summary:
+            analysis.summary = summary
+            await repository.save(analysis)
+    except Exception as exc:
+        logger.warning("Could not save executive summary for %s: %s", analysis_id, exc)
 
 class EmailReportRequest(BaseModel):
     recipient_email: EmailStr
@@ -117,7 +141,8 @@ async def get_pdf_report(analysis_id: str):
     """
     json_report = await get_report(analysis_id)
     analysis_data = json_report["analysis"]
-    
+    await _ensure_executive_summary(analysis_id, analysis_data)
+
     pdf_bytes = generate_pdf_report(analysis_data)
     
     return Response(
@@ -147,6 +172,7 @@ async def email_pdf_report(analysis_id: str, request: EmailReportRequest):
     # 2. Retrieve analysis data
     json_report = await get_report(analysis_id)
     analysis_data = json_report["analysis"]
+    await _ensure_executive_summary(analysis_id, analysis_data)
     
     # 3. Generate PDF bytes
     pdf_bytes = generate_pdf_report(analysis_data)
